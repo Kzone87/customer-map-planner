@@ -11,62 +11,75 @@
     <script defer src="./app.js"></script>
 </head>
 <body>
+<a class="skip-link" href="#workspace">작업 영역으로 건너뛰기</a>
 <header class="app-header">
     <div>
         <p class="eyebrow">BROWSER WORKFLOW AUTOMATION</p>
         <h1>Customer Map Planner</h1>
-        <p>Excel 거래처 데이터를 지도에 배치하고 클러스터링하여 A4로 출력하는 업무 도구</p>
+        <p>Excel 거래처 목록을 선택·지오코딩·클러스터링하고 인쇄용 지도로 만드는 현장 업무 도구</p>
     </div>
     <div id="status" class="status" role="status" aria-live="polite"></div>
 </header>
 
+<section class="summary-bar" aria-label="현재 데이터 상태">
+    <article><span>불러온 거래처</span><strong id="allCount">0</strong></article>
+    <article><span>선택 거래처</span><strong id="selectedCount">0</strong></article>
+    <article><span>지도 표시</span><strong id="mappedCount">0</strong></article>
+    <article><span>주소 확인 실패</span><strong id="failedCount">0</strong></article>
+</section>
+
 <div id="measure-box" aria-hidden="true"></div>
 
-<main class="wrapper">
-    <aside class="panel" aria-label="지도 설정">
+<main id="workspace" class="wrapper">
+    <aside class="panel" aria-label="지도 설정 및 거래처 선택">
         <section class="box">
             <div class="section-title-row">
-                <h2>1. 지도 활성화</h2>
+                <h2>1. 지도 연결</h2>
                 <span class="step-badge">Kakao Maps</span>
             </div>
-            <label for="apiKeyInput" class="hint">Kakao JavaScript 키</label>
+            <label for="apiKeyInput" class="field-label">Kakao JavaScript 키</label>
             <div class="row">
-                <input type="text" id="apiKeyInput" autocomplete="off" placeholder="Kakao JavaScript 키">
-                <button type="button" id="initMapButton">활성화</button>
+                <input type="password" id="apiKeyInput" autocomplete="off" placeholder="브라우저 세션에만 입력">
+                <button type="button" id="initMapButton">지도 연결</button>
             </div>
 
             <div class="field-grid">
                 <div>
-                    <label for="originAddressInput" class="hint">기준 주소 (선택)</label>
+                    <label for="originAddressInput" class="field-label">기준 주소 (선택)</label>
                     <input type="text" id="originAddressInput" placeholder="예: 서울특별시 중구 세종대로 110">
                 </div>
                 <div>
-                    <label for="clusterDistanceInput" class="hint">클러스터 거리 (m)</label>
+                    <label for="clusterDistanceInput" class="field-label">클러스터 거리 (m)</label>
                     <input type="number" id="clusterDistanceInput" min="100" max="10000" step="100" value="1000">
                 </div>
             </div>
-            <p class="hint">키와 기준 주소는 저장소에 저장하지 않습니다. Kakao Developers에서 사용 도메인을 제한해 사용하세요.</p>
+            <div class="mini-actions">
+                <button type="button" id="clearOriginButton" class="text-button">기준점 지우기</button>
+                <span>API 키는 저장하지 않습니다.</span>
+            </div>
         </section>
 
         <section class="box">
             <div class="section-title-row">
-                <h2>2. 거래처 데이터 불러오기</h2>
-                <span class="step-badge">Browser only</span>
+                <h2>2. 거래처 데이터</h2>
+                <span class="step-badge">Local browser</span>
             </div>
             <input type="file" id="excelFile" accept=".xlsx,.xls">
-            <div class="action-row">
-                <button type="button" id="loadSampleButton" class="secondary">샘플 거래처 불러오기</button>
+            <div class="action-grid">
+                <button type="button" id="loadSampleButton" class="secondary">샘플 불러오기</button>
+                <button type="button" id="downloadSampleButton" class="secondary">샘플 Excel</button>
+                <button type="button" id="clearDataButton" class="ghost">데이터 비우기</button>
             </div>
-            <p class="hint">첫 번째 시트에 <strong>거래처명</strong>, <strong>주소</strong> 컬럼이 필요합니다. 빈 행과 완전 중복 행은 자동 제외합니다.</p>
+            <p class="hint">첫 번째 시트에 <strong>거래처명</strong>, <strong>주소</strong> 컬럼이 필요합니다. 빈 행과 완전 중복 행은 제외합니다.</p>
         </section>
 
         <section class="box">
             <div class="section-title-row">
                 <h2>3. 거래처 선택</h2>
-                <button type="button" id="selectAllButton" class="text-button">현재 목록 선택</button>
+                <button type="button" id="selectAllButton" class="text-button">현재 목록 전체 선택</button>
             </div>
-            <input type="text" id="searchInput" placeholder="거래처명 검색" autocomplete="off">
-            <div id="searchList" class="list"></div>
+            <input type="search" id="searchInput" placeholder="거래처명 또는 주소 검색" autocomplete="off">
+            <div id="searchList" class="list" aria-label="거래처 검색 결과"></div>
         </section>
 
         <section class="box">
@@ -74,22 +87,51 @@
                 <h2>4. 지도 표시 목록</h2>
                 <button type="button" id="clearSelectedButton" class="text-button danger-text">선택 비우기</button>
             </div>
-            <div id="selectedList" class="list"></div>
-            <button type="button" id="printButton" class="print">A4 가로 인쇄</button>
+            <div id="selectedList" class="list selected-list" aria-label="선택된 거래처"></div>
+            <div class="action-grid two">
+                <button type="button" id="exportSelectedButton" class="secondary">선택 목록 Excel</button>
+                <button type="button" id="printButton" class="print">A4 가로 인쇄</button>
+            </div>
+        </section>
+
+        <section id="failureSection" class="box failure-box" hidden>
+            <div class="section-title-row">
+                <h2>주소 확인 실패</h2>
+                <button type="button" id="retryAllButton" class="text-button">전체 재시도</button>
+            </div>
+            <p class="hint">주소를 수정한 뒤 개별 재시도할 수 있습니다. 수정 내용은 현재 브라우저 작업 상태에만 반영됩니다.</p>
+            <div id="failedList" class="failure-list"></div>
         </section>
     </aside>
 
-    <section id="map-wrap" aria-label="거래처 지도">
-        <div id="map">
-            <div class="map-placeholder">
-                <strong>지도 미활성화</strong>
-                <span>왼쪽에서 Kakao JavaScript 키를 입력하고 지도를 활성화하세요.</span>
-                <span>샘플 거래처는 키 없이도 먼저 불러와 선택 흐름을 확인할 수 있습니다.</span>
+    <section class="map-column" aria-label="거래처 지도">
+        <div class="map-toolbar">
+            <div>
+                <strong>지도 작업영역</strong>
+                <span id="mapMeta">지도를 연결하면 선택 거래처가 표시됩니다.</span>
+            </div>
+            <div class="map-actions">
+                <button type="button" id="fitMapButton" class="secondary">전체 보기</button>
+                <button type="button" id="refreshMapButton" class="secondary">지도 새로고침</button>
             </div>
         </div>
-        <canvas id="line-canvas"></canvas>
-        <div id="label-canvas"></div>
+        <div id="map-wrap">
+            <div id="map">
+                <div class="map-placeholder">
+                    <strong>지도 미연결</strong>
+                    <span>왼쪽에서 Kakao JavaScript 키를 입력하고 지도를 연결하세요.</span>
+                    <span>샘플 데이터와 선택/검색 흐름은 지도 연결 전에도 확인할 수 있습니다.</span>
+                </div>
+            </div>
+            <canvas id="line-canvas"></canvas>
+            <div id="label-canvas"></div>
+        </div>
     </section>
 </main>
+
+<footer class="app-footer">
+    <span>Excel과 주소 데이터는 서버로 업로드하지 않고 브라우저에서 처리합니다.</span>
+    <a href="https://github.com/Kzone87/customer-map-planner" target="_blank" rel="noreferrer">Repository ↗</a>
+</footer>
 </body>
 </html>
