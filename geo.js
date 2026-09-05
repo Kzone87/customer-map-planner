@@ -10,6 +10,12 @@
         return EARTH_RADIUS_M * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
     }
 
+    function normalizeClusterDistance(value, fallback = 1000, min = 100, max = 10_000) {
+        const parsed = Number(value);
+        if (!Number.isFinite(parsed)) return fallback;
+        return Math.min(max, Math.max(min, Math.round(parsed)));
+    }
+
     function clusterByDistance(points, thresholdMeters) {
         const visited = new Array(points.length).fill(false);
         const clusters = [];
@@ -55,7 +61,7 @@
         return clusters;
     }
 
-    const api = Object.freeze({ distanceMeters, clusterByDistance });
+    const api = Object.freeze({ distanceMeters, normalizeClusterDistance, clusterByDistance });
 
     if (typeof window !== 'undefined') {
         window.GeoUtils = api;
