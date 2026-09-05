@@ -30,6 +30,7 @@ export type Operation = {
 const EMAIL_HINT = /(email|e-mail|메일|이메일)/i;
 const PHONE_HINT = /(phone|mobile|tel|전화|연락처|휴대폰)/i;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const VALID_OPERATIONS = new Set<OperationKind>(['trim', 'email', 'phone', 'dedupe']);
 
 export const SAMPLE_ROWS: DataRow[] = [
   { 거래처명: '  새한상사 ', 이메일: 'SALES@SAEHAN.CO.KR', 연락처: '01012345678', 지역: '서울', 상태: 'ACTIVE' },
@@ -191,6 +192,10 @@ export function removeDuplicateRows(rows: DataRow[]): DataRow[] {
   });
 }
 
+export function isOperationKind(value: unknown): value is OperationKind {
+  return typeof value === 'string' && VALID_OPERATIONS.has(value as OperationKind);
+}
+
 export function applyOperation(rows: DataRow[], operation: OperationKind): DataRow[] {
   switch (operation) {
     case 'trim': return normalizeWhitespace(rows);
@@ -210,15 +215,33 @@ export function operationLabel(kind: OperationKind): string {
   return labels[kind];
 }
 
+/**
+ * Spreadsheet applications may interpret user-controlled strings beginning with
+ * formula markers as formulas. Exports prefix an apostrophe for suspicious text
+ * while preserving ordinary negative numeric strings such as -1200.
+ */
+export function sanitizeSpreadsheetCell(value: CellValue): CellValue {
+  if (typeof value !== 'string') return value;
+  if (/^[=+@\t\r]/.test(value)) return `'${value}`;
+  if (/^-/.test(value) && !/^-\d+(?:[.,]\d+)?$/.test(value.trim())) return `'${value}`;
+  return value;
+}
+
+export function prepareRowsForSpreadsheet(rows: DataRow[]): DataRow[] {
+  return rows.map((row) => Object.fromEntries(
+    Object.entries(row).map(([key, value]) => [key, sanitizeSpreadsheetCell(value)])
+  ));
+}
+
 export function exportCsv(rows: DataRow[]): Blob {
-  const sheet = XLSX.utils.json_to_sheet(rows);
+  const sheet = XLSX.utils.json_to_sheet(prepareRowsForSpreadsheet(rows));
   const csv = XLSX.utils.sheet_to_csv(sheet);
   return new Blob(['\ufeff', csv], { type: 'text/csv;charset=utf-8' });
 }
 
 export function exportXlsx(rows: DataRow[]): Blob {
   const workbook = XLSX.utils.book_new();
-  const sheet = XLSX.utils.json_to_sheet(rows);
+  const sheet = XLSX.utils.json_to_sheet(prepareRowsForSpreadsheet(rows));
   XLSX.utils.book_append_sheet(workbook, sheet, 'cleaned-data');
   const buffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' });
   return new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });

@@ -1,4 +1,4 @@
-# Customer Data Workbench
+# Customer Data Workbench · V2.1
 
 ![CI](https://github.com/Kzone87/customer-map-planner/actions/workflows/ci.yml/badge.svg)
 
@@ -34,6 +34,44 @@ Excel/CSV로 관리하던 고객·거래처 데이터를 **서버 업로드나 A
 - 반복 작업 순서를 Recipe로 `localStorage`에 저장하고 재실행
 - CSV / XLSX export
 - 50행 단위 미리보기 pagination
+- spreadsheet formula injection 위험을 줄이기 위한 export sanitization
+
+## V2.1 reliability improvements
+
+V2의 기본 기능을 만든 뒤 실제 반복 사용에서 문제가 될 수 있는 상태와 export 경계를 추가로 정리했습니다.
+
+### Undo / Redo snapshot
+
+History는 데이터만 저장하지 않고 **적용된 operation 목록도 함께 snapshot**합니다.
+
+```text
+rows
+operations
+   ↓
+Snapshot
+   ↓
+Undo / Redo
+```
+
+따라서 여러 단계 Recipe를 한 번에 실행한 뒤 Undo해도 데이터와 화면의 작업 이력이 서로 어긋나지 않습니다.
+
+### Recipe validation
+
+`localStorage` 값은 신뢰하지 않습니다.
+
+- 저장 데이터가 배열인지 확인
+- Recipe name type 확인
+- 허용 operation(`trim`, `email`, `phone`, `dedupe`)만 수락
+- 비어 있거나 손상된 Recipe 제외
+- 사용자가 Recipe를 선택하지 않은 상태에서는 실행하지 않음
+
+### Spreadsheet-safe export
+
+CSV/XLSX는 사용자가 제공한 문자열이 spreadsheet에서 수식으로 해석될 수 있는 경계를 고려합니다.
+
+`=`, `+`, `@` 등 formula marker로 시작하는 의심 문자열은 export 직전에 apostrophe를 붙여 text로 처리합니다. 일반적인 음수 숫자 문자열은 그대로 유지합니다.
+
+원본 메모리 데이터 자체는 export sanitization 과정에서 변경하지 않습니다.
 
 ## No API key / no backend
 
@@ -50,7 +88,7 @@ Browser
     ├─ Transform
     ├─ Undo / Redo
     ├─ Recipe
-    └─ Export
+    └─ Safe Export
 ```
 
 업로드한 파일은 애플리케이션 서버로 전송하지 않습니다. 공개 데모에서도 실제 업무 데이터 대신 샘플 데이터를 사용하는 것을 권장합니다.
@@ -64,7 +102,9 @@ Browser
 - localStorage
 - Vitest
 - GitHub Actions
-- GitHub Pages compatible build
+- GitHub Pages
+
+Dependency version은 `package.json`에서 명시적으로 고정합니다.
 
 ## Run locally
 
@@ -84,13 +124,16 @@ npm run build
 
 ## Test coverage
 
-현재 자동화 테스트는 다음 핵심 규칙을 검증합니다.
+자동화 테스트에서 다음 규칙을 검증합니다.
 
 - 품질 프로파일이 중복/잘못된 이메일/빈 값을 탐지하는지
 - 완전 중복 제거가 결정적으로 동작하는지
 - 공백 정규화가 문자열만 변경하는지
 - 이메일 컬럼 정규화
 - 대표적인 국내 전화번호 형식 변환
+- Recipe operation allow-list
+- spreadsheet formula-like cell neutralization
+- export용 row를 만들 때 source row를 변경하지 않는지
 
 ## Client-facing value
 
@@ -101,6 +144,7 @@ npm run build
 - 입력 데이터 품질 검사와 정규화
 - 반복 업무 자동화 Recipe
 - 원본 보존과 Undo/Redo를 고려한 안전한 데이터 변환
+- spreadsheet export 경계의 입력 안전성 고려
 - 결과 파일 재생성 및 인수인계 가능한 테스트/CI
 
 ### 확장 가능한 외주 유형
@@ -116,19 +160,21 @@ npm run build
 
 ```text
 src/main.ts
-  ├─ 화면 상태
-  ├─ History / Recipe
-  └─ UI rendering
+  ├─ UI state
+  ├─ Snapshot history
+  ├─ Recipe validation
+  └─ rendering
        ↓
 src/data.ts
   ├─ File parsing
   ├─ Data profiling
   ├─ Validation
   ├─ Transformation
-  └─ Export
+  ├─ Search
+  └─ Safe export
 ```
 
-지도 기능을 중심으로 했던 초기 버전은 외부 지도 API 의존성과 사용 진입장벽이 있었습니다. V2에서는 공개 포트폴리오의 목적을 다시 정의하고, 더 넓은 기업 업무에 재사용할 수 있도록 **API-free data workbench**로 전환했습니다.
+지도 기능을 중심으로 했던 초기 버전은 외부 지도 API 의존성과 사용 진입장벽이 있었습니다. V2에서는 공개 포트폴리오의 목적을 다시 정의하고 더 넓은 기업 업무에 재사용할 수 있도록 **API-free data workbench**로 전환했습니다.
 
 ## Portfolio policy
 
