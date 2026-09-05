@@ -2,9 +2,7 @@
 
 Excel에 관리하던 거래처 목록을 검색해 지도에 표시하고, 가까운 거래처를 자동으로 묶어 A4 가로 지도로 출력하는 브라우저 기반 업무 도구입니다.
 
-**Live Demo:** https://kzone87.github.io/geocoding/
-
-> Repository name is still `geocoding` for history compatibility. The portfolio-facing project name is **Customer Map Planner**.
+**Live Demo:** https://kzone87.github.io/customer-map-planner/
 
 ## Why I built it
 
