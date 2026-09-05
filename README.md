@@ -1,14 +1,14 @@
-# Customer Data Workbench · V2.1
+# Customer Data Workbench · V2.2
 
 ![CI](https://github.com/Kzone87/customer-map-planner/actions/workflows/ci.yml/badge.svg)
 
-Excel/CSV로 관리하던 고객·거래처 데이터를 **서버 업로드나 API Key 없이 브라우저에서 검증, 정리, 중복 제거, 반복 변환하고 다시 내보내는 업무 자동화 도구**입니다.
+Excel/CSV로 관리하던 고객·거래처 데이터를 **서버 업로드나 API Key 없이 브라우저에서 검증, 정리, 중복 제거, 반복 변환하고 검수 리포트까지 내보내는 업무 자동화 도구**입니다.
 
 > 저장소 이름은 기존 Git 이력을 보존하기 위해 `customer-map-planner`를 유지하지만, V2부터 핵심 제품은 지도 도구가 아니라 **local-first customer data workflow**입니다.
 
 ## Why this exists
 
-실무의 Excel 데이터는 단순히 파일을 읽는 것으로 끝나지 않습니다.
+실무의 Excel 데이터는 단순히 파일을 읽고 수정하는 것으로 끝나지 않습니다.
 
 - 공백과 대소문자가 섞인 값
 - 전화번호 형식 불일치
@@ -16,6 +16,7 @@ Excel/CSV로 관리하던 고객·거래처 데이터를 **서버 업로드나 A
 - 완전 중복 행
 - 매달 반복되는 동일한 정리 작업
 - 정리 후 다시 Excel로 전달해야 하는 흐름
+- 발견한 오류를 담당자에게 별도 문서로 전달해야 하는 검수 흐름
 
 이 프로젝트는 그런 반복 업무를 별도 서버 구축 없이 처리하는 공개 포트폴리오 사례입니다.
 
@@ -35,10 +36,55 @@ Excel/CSV로 관리하던 고객·거래처 데이터를 **서버 업로드나 A
 - CSV / XLSX export
 - 50행 단위 미리보기 pagination
 - spreadsheet formula injection 위험을 줄이기 위한 export sanitization
+- **품질 이슈 필터별 Validation Report CSV export**
+
+## V2.2 validation report
+
+V2.2에서는 데이터 정리 도구를 **검수 결과 전달까지 가능한 workflow**로 확장했습니다.
+
+### Filtered issue report
+
+`QUALITY REVIEW`에서 현재 선택한 이슈 유형을 기준으로 CSV 보고서를 생성합니다.
+
+지원 필터:
+
+- 전체 문제
+- 빈 값
+- 이메일
+- 전화번호
+- 중복
+
+보고서에는 다음 정보가 들어갑니다.
+
+| Field | Description |
+| --- | --- |
+| 행번호 | 원본 데이터 기준 행 위치 |
+| 컬럼 | 문제가 발견된 컬럼 |
+| 유형 | 빈 값 / 이메일 / 전화번호 / 중복 |
+| 메시지 | 검수 사유 |
+| 현재값 | 현재 데이터 값 또는 중복 행 요약 |
+
+예를 들어 ERP/CRM 업로드 전에 이메일 오류만 따로 추출해 담당자에게 전달하거나, 중복 행만 별도 검수 목록으로 넘길 수 있습니다.
+
+### Spreadsheet-safe report export
+
+검수 리포트도 기존 CSV/XLSX와 동일한 spreadsheet-safe export 경계를 사용합니다.
+
+```text
+QualityIssue
+    ↓
+report row
+    ↓
+prepareRowsForSpreadsheet
+    ↓
+CSV
+```
+
+따라서 현재값이 `=`, `+`, `@` 등 spreadsheet formula marker로 시작하더라도 export 직전에 text로 neutralize합니다. 원본 메모리 데이터는 변경하지 않습니다.
 
 ## V2.1 reliability improvements
 
-V2의 기본 기능을 만든 뒤 실제 반복 사용에서 문제가 될 수 있는 상태와 export 경계를 추가로 정리했습니다.
+V2.1에서는 실제 반복 사용에서 문제가 될 수 있는 상태와 export 경계를 강화했습니다.
 
 ### Undo / Redo snapshot
 
@@ -65,7 +111,7 @@ Undo / Redo
 - 비어 있거나 손상된 Recipe 제외
 - 사용자가 Recipe를 선택하지 않은 상태에서는 실행하지 않음
 
-### Spreadsheet-safe export
+### Spreadsheet-safe data export
 
 CSV/XLSX는 사용자가 제공한 문자열이 spreadsheet에서 수식으로 해석될 수 있는 경계를 고려합니다.
 
@@ -88,7 +134,8 @@ Browser
     ├─ Transform
     ├─ Undo / Redo
     ├─ Recipe
-    └─ Safe Export
+    ├─ Safe data export
+    └─ Validation report export
 ```
 
 업로드한 파일은 애플리케이션 서버로 전송하지 않습니다. 공개 데모에서도 실제 업무 데이터 대신 샘플 데이터를 사용하는 것을 권장합니다.
@@ -134,6 +181,9 @@ npm run build
 - Recipe operation allow-list
 - spreadsheet formula-like cell neutralization
 - export용 row를 만들 때 source row를 변경하지 않는지
+- 품질 이슈가 report row로 빠짐없이 변환되는지
+- 선택한 이슈 유형만 report에 포함되는지
+- validation report도 spreadsheet-safe export를 재사용하는지
 
 ## Client-facing value
 
@@ -144,6 +194,7 @@ npm run build
 - 입력 데이터 품질 검사와 정규화
 - 반복 업무 자동화 Recipe
 - 원본 보존과 Undo/Redo를 고려한 안전한 데이터 변환
+- 검수 오류를 담당자에게 전달 가능한 report 생성
 - spreadsheet export 경계의 입력 안전성 고려
 - 결과 파일 재생성 및 인수인계 가능한 테스트/CI
 
@@ -155,6 +206,7 @@ npm run build
 - Excel 병합·변환·중복 제거 도구
 - 관리자 시스템용 import 전처리기
 - 데이터 migration 사전 점검 도구
+- 업로드 오류 검수 리포트 생성기
 
 ## Architecture
 
@@ -163,6 +215,7 @@ src/main.ts
   ├─ UI state
   ├─ Snapshot history
   ├─ Recipe validation
+  ├─ issue filter
   └─ rendering
        ↓
 src/data.ts
@@ -172,6 +225,11 @@ src/data.ts
   ├─ Transformation
   ├─ Search
   └─ Safe export
+       ↓
+src/report.ts
+  ├─ QualityIssue → report row
+  ├─ filter-aware report building
+  └─ safe CSV report export
 ```
 
 지도 기능을 중심으로 했던 초기 버전은 외부 지도 API 의존성과 사용 진입장벽이 있었습니다. V2에서는 공개 포트폴리오의 목적을 다시 정의하고 더 넓은 기업 업무에 재사용할 수 있도록 **API-free data workbench**로 전환했습니다.
