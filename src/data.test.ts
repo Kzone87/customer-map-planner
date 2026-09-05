@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   formatPhone,
+  isOperationKind,
   normalizeEmails,
   normalizeWhitespace,
+  prepareRowsForSpreadsheet,
   profileRows,
   removeDuplicateRows,
-  SAMPLE_ROWS
+  SAMPLE_ROWS,
+  sanitizeSpreadsheetCell
 } from './data';
 
 describe('data quality engine', () => {
@@ -37,5 +40,29 @@ describe('normalization', () => {
   it('formats common Korean phone numbers', () => {
     expect(formatPhone('01012345678')).toBe('010-1234-5678');
     expect(formatPhone('02 1234 5678')).toBe('02-1234-5678');
+  });
+});
+
+describe('recipe and export safety', () => {
+  it('accepts only supported operation identifiers', () => {
+    expect(isOperationKind('trim')).toBe(true);
+    expect(isOperationKind('dedupe')).toBe(true);
+    expect(isOperationKind('unknown')).toBe(false);
+  });
+
+  it('neutralizes formula-like text before spreadsheet export', () => {
+    expect(sanitizeSpreadsheetCell('=HYPERLINK("https://example.com")')).toBe("'=HYPERLINK(\"https://example.com\")");
+    expect(sanitizeSpreadsheetCell('+SUM(1,2)')).toBe("'+SUM(1,2)");
+    expect(sanitizeSpreadsheetCell('@cmd')).toBe("'@cmd");
+    expect(sanitizeSpreadsheetCell('-1200')).toBe('-1200');
+    expect(sanitizeSpreadsheetCell(1200)).toBe(1200);
+  });
+
+  it('sanitizes exported rows without mutating source rows', () => {
+    const source = [{ name: '=1+1', amount: -10 }];
+    const output = prepareRowsForSpreadsheet(source);
+    expect(output[0]?.name).toBe("'=1+1");
+    expect(source[0]?.name).toBe('=1+1');
+    expect(output[0]?.amount).toBe(-10);
   });
 });
