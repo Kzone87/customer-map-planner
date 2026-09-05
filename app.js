@@ -1,9 +1,18 @@
 (() => {
     const REQUIRED_COLUMNS = ['거래처명', '주소'];
-    const CLUSTER_DISTANCE_M = 1000;
+    const DEFAULT_CLUSTER_DISTANCE_M = 1000;
     const MARKER_RADIUS = 6;
     const LABEL_GAP = 10;
     const LABEL_PADDING = 6;
+    const MAX_VISIBLE_RESULTS = 100;
+    const SAMPLE_CLIENTS = Object.freeze([
+        { name: '서울시청', address: '서울특별시 중구 세종대로 110' },
+        { name: '광화문', address: '서울특별시 종로구 세종대로 175' },
+        { name: '종로1가', address: '서울특별시 종로구 종로 1' },
+        { name: '을지로', address: '서울특별시 중구 을지로 30' },
+        { name: '명동', address: '서울특별시 중구 퇴계로 100' },
+        { name: '서울역', address: '서울특별시 용산구 한강대로 405' },
+    ]);
 
     const state = {
         map: null,
@@ -15,16 +24,21 @@
         repositionTimer: null,
         allClients: [],
         selectedClients: [],
+        geocodeCache: new Map(),
     };
 
     const elements = {
         apiKey: document.getElementById('apiKeyInput'),
         originAddress: document.getElementById('originAddressInput'),
+        clusterDistance: document.getElementById('clusterDistanceInput'),
         initMap: document.getElementById('initMapButton'),
         excelFile: document.getElementById('excelFile'),
+        loadSample: document.getElementById('loadSampleButton'),
         search: document.getElementById('searchInput'),
+        selectAll: document.getElementById('selectAllButton'),
         searchList: document.getElementById('searchList'),
         selectedList: document.getElementById('selectedList'),
+        clearSelected: document.getElementById('clearSelectedButton'),
         print: document.getElementById('printButton'),
         status: document.getElementById('status'),
         map: document.getElementById('map'),
@@ -54,18 +68,34 @@
     }
 
     function geocodeAddress(address) {
+        if (state.geocodeCache.has(address)) {
+            return Promise.resolve(state.geocodeCache.get(address));
+        }
+
         return new Promise(resolve => {
             state.geocoder.addressSearch(address, (result, status) => {
                 if (status !== kakao.maps.services.Status.OK || result.length === 0) {
+                    state.geocodeCache.set(address, null);
                     resolve(null);
                     return;
                 }
-                resolve({
+                const point = {
                     lat: Number(result[0].y),
                     lng: Number(result[0].x),
-                });
+                };
+                state.geocodeCache.set(address, point);
+                resolve(point);
             });
         });
+    }
+
+    function getClusterDistance() {
+        const distance = GeoUtils.normalizeClusterDistance(
+            elements.clusterDistance.value,
+            DEFAULT_CLUSTER_DISTANCE_M,
+        );
+        elements.clusterDistance.value = String(distance);
+        return distance;
     }
 
     async function initializeMap() {
@@ -177,6 +207,17 @@
         });
     }
 
+    function setClientData(clients, { autoSelect = false, source = '데이터' } = {}) {
+        state.allClients = clients;
+        state.selectedClients = autoSelect ? [...clients] : [];
+        elements.search.value = '';
+        renderSearchResults('');
+        renderSelectedList();
+        clearClientMarkers();
+        clearCanvas();
+        setStatus(`${source}에서 거래처 ${clients.length}건을 불러왔습니다${autoSelect ? ' · 전체 선택됨' : ''}.`, 'success');
+    }
+
     async function handleExcelFile(event) {
         const [file] = event.target.files;
         if (!file) return;
@@ -184,13 +225,7 @@
 
         try {
             const clients = await readExcel(file);
-            state.allClients = clients;
-            state.selectedClients = [];
-            renderSearchResults('');
-            renderSelectedList();
-            clearClientMarkers();
-            clearCanvas();
-            setStatus(`거래처 ${clients.length}건을 불러왔습니다.`, 'success');
+            setClientData(clients, { source: file.name });
         } catch (error) {
             console.error(error);
             state.allClients = [];
@@ -199,6 +234,14 @@
             renderSelectedList();
             setStatus(error.message || 'Excel 처리 중 오류가 발생했습니다.', 'error');
         }
+    }
+
+    async function loadSampleData() {
+        setClientData(SAMPLE_CLIENTS.map(client => ({ ...client })), {
+            autoSelect: true,
+            source: '샘플 데이터',
+        });
+        if (state.map) await updateMap();
     }
 
     function createListRow(client, buttonText, buttonClass, onClick) {
@@ -232,17 +275,21 @@
         container.replaceChildren(empty);
     }
 
-    function renderSearchResults(query) {
+    function getVisibleClients(query = elements.search.value) {
         const normalized = query.trim().toLocaleLowerCase('ko-KR');
-        if (!normalized) {
-            renderEmpty(elements.searchList, state.allClients.length ? '거래처명을 검색하세요.' : '먼저 Excel 파일을 불러오세요.');
+        const matches = normalized
+            ? state.allClients.filter(client => client.name.toLocaleLowerCase('ko-KR').includes(normalized))
+            : state.allClients;
+        return matches.slice(0, MAX_VISIBLE_RESULTS);
+    }
+
+    function renderSearchResults(query) {
+        if (state.allClients.length === 0) {
+            renderEmpty(elements.searchList, 'Excel 또는 샘플 데이터를 먼저 불러오세요.');
             return;
         }
 
-        const matches = state.allClients
-            .filter(client => client.name.toLocaleLowerCase('ko-KR').includes(normalized))
-            .slice(0, 100);
-
+        const matches = getVisibleClients(query);
         if (matches.length === 0) {
             renderEmpty(elements.searchList, '검색 결과가 없습니다.');
             return;
@@ -266,11 +313,33 @@
         if (state.map) await updateMap();
     }
 
+    async function selectVisibleClients() {
+        const existing = new Set(state.selectedClients.map(clientKey));
+        for (const client of getVisibleClients()) {
+            const key = clientKey(client);
+            if (!existing.has(key)) {
+                state.selectedClients.push(client);
+                existing.add(key);
+            }
+        }
+        renderSelectedList();
+        if (state.map) await updateMap();
+        else setStatus(`현재 목록에서 ${state.selectedClients.length}건을 선택했습니다.`, 'success');
+    }
+
     async function removeClient(client) {
         const key = clientKey(client);
         state.selectedClients = state.selectedClients.filter(item => clientKey(item) !== key);
         renderSelectedList();
         if (state.map) await updateMap();
+    }
+
+    async function clearSelectedClients() {
+        state.selectedClients = [];
+        renderSelectedList();
+        clearClientMarkers();
+        clearCanvas();
+        setStatus('지도 표시 목록을 비웠습니다.');
     }
 
     function renderSelectedList() {
@@ -346,9 +415,10 @@
             return;
         }
 
-        buildMarkers(points);
+        const clusterDistance = getClusterDistance();
+        buildMarkers(points, clusterDistance);
         const suffix = failed.length > 0 ? ` · 주소 확인 실패 ${failed.length}건` : '';
-        setStatus(`지도에 ${points.length}건을 표시했습니다${suffix}.`, failed.length ? 'info' : 'success');
+        setStatus(`지도에 ${points.length}건을 표시했습니다 · 클러스터 ${clusterDistance.toLocaleString()}m${suffix}.`, failed.length ? 'info' : 'success');
     }
 
     function measureLabel(names) {
@@ -371,12 +441,12 @@
         return dimensions;
     }
 
-    function buildMarkers(points) {
+    function buildMarkers(points, clusterDistance) {
         const markerImage = kakaoMarkerImage(makeMarkerImage('#e63946', false));
         const bounds = new kakao.maps.LatLngBounds();
         if (state.originPosition) bounds.extend(state.originPosition);
 
-        const clusters = GeoUtils.clusterByDistance(points, CLUSTER_DISTANCE_M);
+        const clusters = GeoUtils.clusterByDistance(points, clusterDistance);
         for (const cluster of clusters) {
             const position = new kakao.maps.LatLng(cluster.lat, cluster.lng);
             const marker = new kakao.maps.Marker({ map: state.map, position, image: markerImage });
@@ -466,7 +536,9 @@
 
             for (let xOffset = 0; xOffset <= maxXOffset; xOffset += step) {
                 for (let absYOffset = 0; absYOffset <= yRange; absYOffset += step) {
-                    const offsets = absYOffset === 0 ? [0] : [yBias < 0 ? -absYOffset : absYOffset, yBias < 0 ? absYOffset : -absYOffset];
+                    const offsets = absYOffset === 0
+                        ? [0]
+                        : [yBias < 0 ? -absYOffset : absYOffset, yBias < 0 ? absYOffset : -absYOffset];
                     for (const yOffset of offsets) {
                         const candidate = {
                             ...current,
@@ -565,15 +637,26 @@
 
     elements.initMap.addEventListener('click', initializeMap);
     elements.excelFile.addEventListener('change', handleExcelFile);
+    elements.loadSample.addEventListener('click', loadSampleData);
     elements.search.addEventListener('input', event => renderSearchResults(event.target.value));
+    elements.selectAll.addEventListener('click', selectVisibleClients);
+    elements.clearSelected.addEventListener('click', clearSelectedClients);
     elements.print.addEventListener('click', () => window.print());
     elements.originAddress.addEventListener('change', async () => {
         if (!state.map || !state.geocoder) return;
         const address = elements.originAddress.value.trim();
         if (address) await setOriginAddress(address);
     });
+    elements.clusterDistance.addEventListener('change', async () => {
+        const distance = getClusterDistance();
+        if (state.map && state.selectedClients.length > 0) {
+            await updateMap();
+        } else {
+            setStatus(`클러스터 거리를 ${distance.toLocaleString()}m로 설정했습니다.`);
+        }
+    });
 
     renderSearchResults('');
     renderSelectedList();
-    setStatus('Kakao JavaScript 키와 Excel 파일은 브라우저에만 입력되며 저장하지 않습니다.');
+    setStatus('샘플 거래처로 먼저 흐름을 확인하거나, Kakao JavaScript 키와 Excel 파일을 입력해 실제 데이터를 사용하세요.');
 })();
