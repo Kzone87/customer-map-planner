@@ -6,6 +6,7 @@ import {
   exportCsv,
   exportXlsx,
   getColumns,
+  isOperationKind,
   matchesQuery,
   Operation,
   OperationKind,
@@ -17,6 +18,7 @@ import {
 
 type Snapshot = {
   rows: DataRow[];
+  operations: Operation[];
   label: string;
 };
 
@@ -72,21 +74,39 @@ function cloneRows(rows: DataRow[]): DataRow[] {
   return rows.map((row) => ({ ...row }));
 }
 
+function cloneOperations(operations: Operation[]): Operation[] {
+  return operations.map((operation) => ({ ...operation }));
+}
+
+function currentSnapshot(label: string): Snapshot {
+  return {
+    rows: cloneRows(state.rows),
+    operations: cloneOperations(state.operations),
+    label
+  };
+}
+
+function restoreSnapshot(snapshot: Snapshot) {
+  state.rows = cloneRows(snapshot.rows);
+  state.operations = cloneOperations(snapshot.operations);
+  state.page = 0;
+}
+
 function setStatus(message: string, kind: 'info' | 'success' | 'error' = 'info') {
   elements.status.textContent = message;
   elements.status.dataset.kind = kind;
 }
 
 function pushHistory(label: string) {
-  state.history.push({ rows: cloneRows(state.rows), label });
+  state.history.push(currentSnapshot(label));
   if (state.history.length > 30) state.history.shift();
   state.future = [];
 }
 
-function runOperation(kind: OperationKind, record = true) {
+function runOperation(kind: OperationKind) {
   pushHistory(operationLabel(kind));
   state.rows = applyOperation(state.rows, kind);
-  if (record) state.operations.push({ kind, label: operationLabel(kind) });
+  state.operations.push({ kind, label: operationLabel(kind) });
   state.page = 0;
   render();
   setStatus(`${operationLabel(kind)} 작업을 적용했습니다.`, 'success');
@@ -95,10 +115,8 @@ function runOperation(kind: OperationKind, record = true) {
 function undo() {
   const previous = state.history.pop();
   if (!previous) return;
-  state.future.push({ rows: cloneRows(state.rows), label: previous.label });
-  state.rows = previous.rows;
-  state.operations.pop();
-  state.page = 0;
+  state.future.push(currentSnapshot(previous.label));
+  restoreSnapshot(previous);
   render();
   setStatus(`실행 취소: ${previous.label}`);
 }
@@ -106,9 +124,8 @@ function undo() {
 function redo() {
   const next = state.future.pop();
   if (!next) return;
-  state.history.push({ rows: cloneRows(state.rows), label: next.label });
-  state.rows = next.rows;
-  state.page = 0;
+  state.history.push(currentSnapshot(next.label));
+  restoreSnapshot(next);
   render();
   setStatus(`다시 실행: ${next.label}`);
 }
@@ -270,8 +287,17 @@ function readRecipes(): SavedRecipe[] {
   try {
     const raw = localStorage.getItem(RECIPE_KEY);
     if (!raw) return [];
-    const value = JSON.parse(raw) as SavedRecipe[];
-    return Array.isArray(value) ? value : [];
+    const value: unknown = JSON.parse(raw);
+    if (!Array.isArray(value)) return [];
+
+    return value.flatMap((candidate): SavedRecipe[] => {
+      if (!candidate || typeof candidate !== 'object') return [];
+      const record = candidate as Record<string, unknown>;
+      if (typeof record.name !== 'string' || !Array.isArray(record.operations)) return [];
+      const operations = record.operations.filter(isOperationKind);
+      if (operations.length !== record.operations.length || operations.length === 0) return [];
+      return [{ name: record.name.slice(0, 40), operations }];
+    });
   } catch {
     return [];
   }
@@ -322,26 +348,36 @@ function saveRecipe() {
     return;
   }
   const recipes = readRecipes().filter((recipe) => recipe.name !== name);
-  recipes.push({ name, operations });
+  recipes.push({ name: name.slice(0, 40), operations });
   writeRecipes(recipes);
   elements.recipeName.value = '';
   setStatus(`Recipe “${name}”을 브라우저에 저장했습니다.`, 'success');
 }
 
 function runRecipe() {
-  const index = Number(elements.recipeSelect.value);
-  const recipe = readRecipes()[index];
-  if (!recipe) {
+  const selected = elements.recipeSelect.value;
+  if (!selected) {
     setStatus('실행할 Recipe를 선택하세요.', 'error');
     return;
   }
+
+  const index = Number(selected);
+  const recipe = Number.isInteger(index) ? readRecipes()[index] : undefined;
+  if (!recipe) {
+    setStatus('저장된 Recipe를 읽을 수 없습니다.', 'error');
+    renderRecipeSelect();
+    return;
+  }
+
   pushHistory(`Recipe: ${recipe.name}`);
   let rows = cloneRows(state.rows);
+  const nextOperations = cloneOperations(state.operations);
   recipe.operations.forEach((kind) => {
     rows = applyOperation(rows, kind);
-    state.operations.push({ kind, label: operationLabel(kind) });
+    nextOperations.push({ kind, label: operationLabel(kind) });
   });
   state.rows = rows;
+  state.operations = nextOperations;
   state.page = 0;
   render();
   setStatus(`Recipe “${recipe.name}” ${recipe.operations.length}단계를 적용했습니다.`, 'success');
