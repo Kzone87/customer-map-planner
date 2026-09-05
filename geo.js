@@ -16,6 +16,20 @@
         return Math.min(max, Math.max(min, Math.round(parsed)));
     }
 
+    function clientKey(client) {
+        return `${String(client?.name ?? '').trim()}\u0000${String(client?.address ?? '').trim()}`;
+    }
+
+    function filterClients(clients, query) {
+        const normalized = String(query ?? '').trim().toLocaleLowerCase('ko-KR');
+        if (!normalized) return [...clients];
+        return clients.filter(client => {
+            const name = String(client?.name ?? '').toLocaleLowerCase('ko-KR');
+            const address = String(client?.address ?? '').toLocaleLowerCase('ko-KR');
+            return name.includes(normalized) || address.includes(normalized);
+        });
+    }
+
     function clusterByDistance(points, thresholdMeters) {
         const visited = new Array(points.length).fill(false);
         const clusters = [];
@@ -61,7 +75,13 @@
         return clusters;
     }
 
-    const api = Object.freeze({ distanceMeters, normalizeClusterDistance, clusterByDistance });
+    const api = Object.freeze({
+        distanceMeters,
+        normalizeClusterDistance,
+        clientKey,
+        filterClients,
+        clusterByDistance,
+    });
 
     if (typeof window !== 'undefined') {
         window.GeoUtils = api;
