@@ -1,3 +1,4 @@
+import './rules.css';
 import { CellValue, DataRow } from './data';
 
 export type RuleKind = 'required' | 'email' | 'number' | 'enum';
