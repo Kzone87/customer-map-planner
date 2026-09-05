@@ -2,21 +2,26 @@
 
 ![CI](https://github.com/Kzone87/customer-map-planner/actions/workflows/ci.yml/badge.svg)
 
-Excel에 관리하던 거래처 목록을 검색해 지도에 표시하고, 가까운 거래처를 자동으로 묶어 A4 가로 지도로 출력하는 브라우저 기반 업무 도구입니다.
+Excel로 관리하던 거래처 주소 업무를 **검색 → 지도 변환 → 근접 그룹화 → 인쇄**까지 한 흐름으로 줄이는 브라우저 기반 업무 자동화 도구입니다.
 
 **Live Demo:** https://kzone87.github.io/customer-map-planner/
 
-## Why I built it
+## Business problem
 
-현장 방문이나 거래처 관리를 위해 Excel 주소 목록을 지도에 옮길 때 반복적인 주소 검색과 수동 라벨 배치가 필요했습니다. 이 프로젝트는 그 과정을 한 화면에서 처리하기 위해 만들었습니다.
+현장 방문이나 거래처 관리를 위해 Excel 주소 목록을 지도에 옮길 때는 주소 검색, 위치 확인, 가까운 거래처 분류, 라벨 정리와 출력 작업이 반복됩니다.
 
-## Quick demo
+이 프로젝트는 기존 Excel 데이터를 그대로 활용하면서 그 반복 과정을 하나의 브라우저 도구로 연결합니다.
 
-실제 Excel 파일이 없어도 화면에서 **샘플 거래처 불러오기**를 누르면 검색/선택 흐름을 바로 확인할 수 있습니다.
+### 외주 프로젝트로 확장할 수 있는 유형
 
-지도 표시까지 확인하려면 Kakao Developers에서 발급받은 JavaScript 키를 입력하고 지도를 활성화합니다. 샘플 데이터에는 실제 지오코딩 가능한 서울 주소가 포함되어 있습니다.
+- 거래처 / 설치처 / 지점 주소를 지도에서 조회하는 내부 도구
+- 영업·AS·방문 업무의 지역별 대상 분류
+- Excel 주소 데이터의 검증·가공·지도 변환
+- 기준 거리 내 거래처 자동 그룹화
+- 지도 기반 보고서 또는 인쇄물 생성
+- 서버 저장 없이 로컬 파일만 처리해야 하는 경량 업무도구
 
-## Core workflow
+## User workflow
 
 1. Kakao JavaScript 키 입력
 2. 선택적으로 기준 주소 및 클러스터 거리 입력
@@ -26,6 +31,12 @@ Excel에 관리하던 거래처 목록을 검색해 지도에 표시하고, 가�
 6. 설정한 거리 기준으로 근접 거래처 연결 클러스터링
 7. 라벨 겹침을 줄여 자동 배치하고 연결선 렌더링
 8. A4 가로 레이아웃으로 인쇄
+
+## Quick demo
+
+실제 Excel 파일이 없어도 화면에서 **샘플 거래처 불러오기**를 누르면 검색/선택 흐름을 바로 확인할 수 있습니다.
+
+지도 표시까지 확인하려면 Kakao Developers에서 발급받은 JavaScript 키를 입력하고 지도를 활성화합니다. 샘플 데이터에는 실제 지오코딩 가능한 서울 주소가 포함되어 있습니다.
 
 ## Engineering highlights
 
@@ -41,6 +52,26 @@ Excel에 관리하던 거래처 목록을 검색해 지도에 표시하고, 가�
 - **No embedded credentials**: Kakao JavaScript 키와 기준 주소는 저장소에 저장하지 않습니다.
 - **Regression CI**: Node 내장 테스트 러너로 거리 계산, 거리값 정규화와 클러스터링을 검증하고 GitHub Actions에서 문법 검사와 테스트를 실행합니다.
 - **GitHub Pages**: `main` 반영 시 정적 데모를 자동 배포합니다.
+
+## Why this is a useful client case study
+
+이 프로젝트의 핵심은 지도 API 자체가 아니라 **기존 업무 데이터를 버리지 않고 웹 기반 자동화 흐름으로 바꾼 과정**입니다.
+
+```text
+Existing Excel
+    ↓
+Validation / Search
+    ↓
+Geocoding
+    ↓
+Distance calculation
+    ↓
+Clustering / Label layout
+    ↓
+Printable result
+```
+
+외주 업무에서도 같은 방식으로 현재 입력 데이터와 최종 결과 사이의 반복 단계를 찾아 자동화 범위를 설계할 수 있습니다.
 
 ## Project structure
 
@@ -94,9 +125,10 @@ Kakao Maps JavaScript SDK의 앱 키는 브라우저에서 사용되는 클라�
 - 라벨 배치는 휴리스틱 탐색 방식이므로 매우 조밀한 지역에서는 완벽한 배치를 보장하지 않습니다.
 - Excel 데이터는 브라우저 메모리에서만 처리하며 서버에 저장하지 않습니다.
 
-## Next improvements
+## Possible next improvements
 
 - 실패 주소 재시도/수정 UI
 - persistent geocoding cache 옵션
 - CSV 지원
 - 대량 데이터용 순차/제한 동시성 지오코딩
+- 방문 순서 최적화 또는 권역별 담당자 배정
