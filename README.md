@@ -1,134 +1,135 @@
-# Customer Map Planner
+# Customer Data Workbench
 
 ![CI](https://github.com/Kzone87/customer-map-planner/actions/workflows/ci.yml/badge.svg)
 
-Excel로 관리하던 거래처 주소 업무를 **검색 → 지도 변환 → 근접 그룹화 → 인쇄**까지 한 흐름으로 줄이는 브라우저 기반 업무 자동화 도구입니다.
+Excel/CSV로 관리하던 고객·거래처 데이터를 **서버 업로드나 API Key 없이 브라우저에서 검증, 정리, 중복 제거, 반복 변환하고 다시 내보내는 업무 자동화 도구**입니다.
 
-**Live Demo:** https://kzone87.github.io/customer-map-planner/
+> 저장소 이름은 기존 Git 이력을 보존하기 위해 `customer-map-planner`를 유지하지만, V2부터 핵심 제품은 지도 도구가 아니라 **local-first customer data workflow**입니다.
 
-## Business problem
+## Why this exists
 
-현장 방문이나 거래처 관리를 위해 Excel 주소 목록을 지도에 옮길 때는 주소 검색, 위치 확인, 가까운 거래처 분류, 라벨 정리와 출력 작업이 반복됩니다.
+실무의 Excel 데이터는 단순히 파일을 읽는 것으로 끝나지 않습니다.
 
-이 프로젝트는 기존 Excel 데이터를 그대로 활용하면서 그 반복 과정을 하나의 브라우저 도구로 연결합니다.
+- 공백과 대소문자가 섞인 값
+- 전화번호 형식 불일치
+- 잘못된 이메일
+- 완전 중복 행
+- 매달 반복되는 동일한 정리 작업
+- 정리 후 다시 Excel로 전달해야 하는 흐름
 
-### 외주 프로젝트로 확장할 수 있는 유형
+이 프로젝트는 그런 반복 업무를 별도 서버 구축 없이 처리하는 공개 포트폴리오 사례입니다.
 
-- 거래처 / 설치처 / 지점 주소를 지도에서 조회하는 내부 도구
-- 영업·AS·방문 업무의 지역별 대상 분류
-- Excel 주소 데이터의 검증·가공·지도 변환
-- 기준 거리 내 거래처 자동 그룹화
-- 지도 기반 보고서 또는 인쇄물 생성
-- 서버 저장 없이 로컬 파일만 처리해야 하는 경량 업무도구
+## Key features
 
-## User workflow
+- XLSX / XLS / CSV import
+- 모든 데이터는 브라우저 메모리에서 처리
+- 데이터 행·컬럼·품질 문제 자동 프로파일링
+- 빈 값 / 이메일 / 전화번호 / 완전 중복 탐지
+- 전체 컬럼 통합 검색
+- 공백 정규화
+- 이메일 소문자 정규화
+- 한국 전화번호 형식 정리
+- 완전 중복 행 제거
+- Undo / Redo / 원본 복원
+- 반복 작업 순서를 Recipe로 `localStorage`에 저장하고 재실행
+- CSV / XLSX export
+- 50행 단위 미리보기 pagination
 
-1. Kakao JavaScript 키 입력
-2. 선택적으로 기준 주소 및 클러스터 거리 입력
-3. Excel 파일 또는 내장 샘플 거래처 로드
-4. 거래처 검색 및 지도 표시 대상 선택
-5. 주소를 좌표로 변환
-6. 설정한 거리 기준으로 근접 거래처 연결 클러스터링
-7. 라벨 겹침을 줄여 자동 배치하고 연결선 렌더링
-8. A4 가로 레이아웃으로 인쇄
+## No API key / no backend
 
-## Quick demo
-
-실제 Excel 파일이 없어도 화면에서 **샘플 거래처 불러오기**를 누르면 검색/선택 흐름을 바로 확인할 수 있습니다.
-
-지도 표시까지 확인하려면 Kakao Developers에서 발급받은 JavaScript 키를 입력하고 지도를 활성화합니다. 샘플 데이터에는 실제 지오코딩 가능한 서울 주소가 포함되어 있습니다.
-
-## Engineering highlights
-
-- **Excel validation**: 필수 컬럼을 확인하고 빈 데이터와 완전 중복 데이터를 제외합니다.
-- **First-run sample data**: Excel 파일 없이도 데이터 선택 흐름을 바로 확인할 수 있습니다.
-- **Configurable clustering**: 100m~10km 범위에서 클러스터 기준 거리를 조절하고 입력값을 안전하게 정규화합니다.
-- **Connected-distance clustering**: 특정 기준점 하나만 비교하지 않고, 거리 이내로 연결되는 지점을 탐색해 그룹화합니다.
-- **In-memory geocoding cache**: 같은 주소를 반복 선택하거나 클러스터 거리만 바꿀 때 불필요한 재지오코딩을 줄입니다.
-- **Geocoding failure handling**: 주소 변환 실패 건수를 사용자에게 표시합니다.
-- **Label collision reduction**: 지도 마커와 기존 라벨의 충돌을 검사하며 라벨 위치를 탐색합니다.
-- **Canvas + DOM rendering**: 연결선은 Canvas, 텍스트 라벨은 DOM으로 분리해 인쇄 가독성을 확보했습니다.
-- **Safer DOM handling**: 거래처명과 주소를 `innerHTML`로 삽입하지 않고 `textContent` 기반으로 렌더링합니다.
-- **No embedded credentials**: Kakao JavaScript 키와 기준 주소는 저장소에 저장하지 않습니다.
-- **Regression CI**: Node 내장 테스트 러너로 거리 계산, 거리값 정규화와 클러스터링을 검증하고 GitHub Actions에서 문법 검사와 테스트를 실행합니다.
-- **GitHub Pages**: `main` 반영 시 정적 데모를 자동 배포합니다.
-
-## Why this is a useful client case study
-
-이 프로젝트의 핵심은 지도 API 자체가 아니라 **기존 업무 데이터를 버리지 않고 웹 기반 자동화 흐름으로 바꾼 과정**입니다.
+핵심 기능에는 외부 API, 지도 API, 로그인, 서버 DB가 필요하지 않습니다.
 
 ```text
-Existing Excel
+Excel / CSV
     ↓
-Validation / Search
-    ↓
-Geocoding
-    ↓
-Distance calculation
-    ↓
-Clustering / Label layout
-    ↓
-Printable result
+Browser
+    ├─ Parse
+    ├─ Profile
+    ├─ Validate
+    ├─ Search
+    ├─ Transform
+    ├─ Undo / Redo
+    ├─ Recipe
+    └─ Export
 ```
 
-외주 업무에서도 같은 방식으로 현재 입력 데이터와 최종 결과 사이의 반복 단계를 찾아 자동화 범위를 설계할 수 있습니다.
+업로드한 파일은 애플리케이션 서버로 전송하지 않습니다. 공개 데모에서도 실제 업무 데이터 대신 샘플 데이터를 사용하는 것을 권장합니다.
 
-## Project structure
+## Tech stack
 
-```text
-.
-├── .github/workflows/ci.yml  # syntax + regression CI
-├── test/geo.test.js          # distance / clustering regression tests
-├── index.html                # UI structure
-├── styles.css                # screen + A4 print styles
-├── geo.js                    # distance, threshold normalization and clustering utilities
-├── app.js                    # Excel, sample data, Kakao Maps, cache, UI and label workflow
-└── README.md
-```
-
-## Excel format
-
-첫 번째 시트에 다음 컬럼이 필요합니다.
-
-| 거래처명 | 주소 |
-| --- | --- |
-| 샘플 거래처 A | 서울특별시 중구 세종대로 110 |
-| 샘플 거래처 B | 서울특별시 종로구 종로 1 |
-
-추가 컬럼은 있어도 무시됩니다.
+- TypeScript
+- Vite
+- SheetJS (`xlsx`)
+- Browser File API
+- localStorage
+- Vitest
+- GitHub Actions
+- GitHub Pages compatible build
 
 ## Run locally
 
-정적 파일을 HTTP 서버로 제공한 뒤 브라우저에서 접속합니다.
+Requirements: Node.js 20+
 
 ```bash
-python -m http.server 8080
+npm install
+npm run dev
 ```
 
-그 다음 `http://localhost:8080`을 열고 Kakao Developers에서 발급받은 **JavaScript 키**를 입력합니다.
-
-테스트:
+Production verification:
 
 ```bash
-node --test
+npm test
+npm run build
 ```
 
-## Kakao key security
+## Test coverage
 
-Kakao Maps JavaScript SDK의 앱 키는 브라우저에서 사용되는 클라이언트 키이므로 네트워크 요청에서 확인될 수 있습니다. 따라서 비밀값처럼 서버에 숨기는 방식이 아니라, **Kakao Developers에서 허용 도메인을 제한하는 방식**으로 보호해야 합니다. 이 저장소에는 실제 키를 커밋하지 않습니다.
+현재 자동화 테스트는 다음 핵심 규칙을 검증합니다.
 
-## Current limitations
+- 품질 프로파일이 중복/잘못된 이메일/빈 값을 탐지하는지
+- 완전 중복 제거가 결정적으로 동작하는지
+- 공백 정규화가 문자열만 변경하는지
+- 이메일 컬럼 정규화
+- 대표적인 국내 전화번호 형식 변환
 
-- 대량 주소를 한 번에 선택하면 Kakao 지오코딩 호출량의 영향을 받을 수 있습니다.
-- 검색/현재 목록 선택은 한 번에 최대 100건을 화면에 표시합니다.
-- 지오코딩 캐시는 현재 브라우저 세션 메모리에만 유지됩니다.
-- 라벨 배치는 휴리스틱 탐색 방식이므로 매우 조밀한 지역에서는 완벽한 배치를 보장하지 않습니다.
-- Excel 데이터는 브라우저 메모리에서만 처리하며 서버에 저장하지 않습니다.
+## Client-facing value
 
-## Possible next improvements
+이 프로젝트가 증명하는 외주 범위:
 
-- 실패 주소 재시도/수정 UI
-- persistent geocoding cache 옵션
-- CSV 지원
-- 대량 데이터용 순차/제한 동시성 지오코딩
-- 방문 순서 최적화 또는 권역별 담당자 배정
+- 기존 Excel 업무를 브라우저 업무 도구로 전환
+- 외부 서버 없이 동작하는 저비용 내부 도구 설계
+- 입력 데이터 품질 검사와 정규화
+- 반복 업무 자동화 Recipe
+- 원본 보존과 Undo/Redo를 고려한 안전한 데이터 변환
+- 결과 파일 재생성 및 인수인계 가능한 테스트/CI
+
+### 확장 가능한 외주 유형
+
+- 거래처/고객 명단 정리
+- ERP/CRM 업로드 전 데이터 검증
+- 상품/재고/주문 데이터 정규화
+- Excel 병합·변환·중복 제거 도구
+- 관리자 시스템용 import 전처리기
+- 데이터 migration 사전 점검 도구
+
+## Architecture
+
+```text
+src/main.ts
+  ├─ 화면 상태
+  ├─ History / Recipe
+  └─ UI rendering
+       ↓
+src/data.ts
+  ├─ File parsing
+  ├─ Data profiling
+  ├─ Validation
+  ├─ Transformation
+  └─ Export
+```
+
+지도 기능을 중심으로 했던 초기 버전은 외부 지도 API 의존성과 사용 진입장벽이 있었습니다. V2에서는 공개 포트폴리오의 목적을 다시 정의하고, 더 넓은 기업 업무에 재사용할 수 있도록 **API-free data workbench**로 전환했습니다.
+
+## Portfolio policy
+
+이 저장소는 공개 포트폴리오 전용 프로젝트이며 실제 고객사 데이터, 비공개 프로젝트 코드 또는 사업 진행 중인 내부 정보를 포함하지 않습니다.
