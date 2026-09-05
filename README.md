@@ -2,6 +2,8 @@
 
 Excel에 관리하던 거래처 목록을 검색해 지도에 표시하고, 가까운 거래처를 자동으로 묶어 A4 가로 지도로 출력하는 브라우저 기반 업무 도구입니다.
 
+**Live Demo:** https://kzone87.github.io/geocoding/
+
 > Repository name is still `geocoding` for history compatibility. The portfolio-facing project name is **Customer Map Planner**.
 
 ## Why I built it
@@ -28,15 +30,19 @@ Excel에 관리하던 거래처 목록을 검색해 지도에 표시하고, 가�
 - **Canvas + DOM rendering**: 연결선은 Canvas, 텍스트 라벨은 DOM으로 분리해 인쇄 가독성을 확보했습니다.
 - **Safer DOM handling**: 거래처명과 주소를 `innerHTML`로 삽입하지 않고 `textContent` 기반으로 렌더링합니다.
 - **No embedded credentials**: Kakao JavaScript 키와 기준 주소는 저장소에 저장하지 않습니다.
+- **Regression CI**: Node 내장 테스트 러너로 거리 계산과 클러스터링을 검증하고, GitHub Actions에서 JavaScript 문법 검사와 테스트를 실행합니다.
+- **GitHub Pages**: `main` 반영 시 정적 데모를 자동 빌드·배포합니다.
 
 ## Project structure
 
 ```text
 .
-├── index.html      # UI structure
-├── styles.css      # screen + A4 print styles
-├── geo.js          # distance and clustering utilities
-├── app.js          # Excel, Kakao Maps, UI and label placement workflow
+├── .github/workflows/ci.yml  # syntax + regression CI
+├── test/geo.test.js          # distance / clustering tests
+├── index.html                # UI structure
+├── styles.css                # screen + A4 print styles
+├── geo.js                    # distance and clustering utilities
+├── app.js                    # Excel, Kakao Maps, UI and label placement workflow
 └── README.md
 ```
 
@@ -51,17 +57,21 @@ Excel에 관리하던 거래처 목록을 검색해 지도에 표시하고, 가�
 
 추가 컬럼은 있어도 무시됩니다.
 
-## Run
+## Run locally
 
 정적 파일을 HTTP 서버로 제공한 뒤 브라우저에서 접속합니다.
-
-예시:
 
 ```bash
 python -m http.server 8080
 ```
 
 그 다음 `http://localhost:8080`을 열고 Kakao Developers에서 발급받은 **JavaScript 키**를 입력합니다.
+
+테스트:
+
+```bash
+node --test
+```
 
 ## Kakao key security
 
@@ -80,4 +90,3 @@ Kakao Maps JavaScript SDK의 앱 키는 브라우저에서 사용되는 클라�
 - 지오코딩 결과 캐시
 - 실패 주소 재시도/수정 UI
 - CSV 지원
-- 거리/클러스터 순수 함수 자동 테스트
