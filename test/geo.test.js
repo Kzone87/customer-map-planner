@@ -1,6 +1,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { distanceMeters, normalizeClusterDistance, clusterByDistance } = require('../geo.js');
+const {
+    distanceMeters,
+    normalizeClusterDistance,
+    clientKey,
+    filterClients,
+    clusterByDistance,
+} = require('../geo.js');
 
 test('distanceMeters returns zero for identical coordinates', () => {
     assert.equal(distanceMeters(37.5665, 126.9780, 37.5665, 126.9780), 0);
@@ -16,6 +22,25 @@ test('normalizeClusterDistance applies fallback and bounds', () => {
     assert.equal(normalizeClusterDistance(50), 100);
     assert.equal(normalizeClusterDistance(1500.4), 1500);
     assert.equal(normalizeClusterDistance(25_000), 10_000);
+});
+
+test('clientKey normalizes surrounding whitespace', () => {
+    assert.equal(
+        clientKey({ name: ' Alpha ', address: ' Seoul ' }),
+        clientKey({ name: 'Alpha', address: 'Seoul' }),
+    );
+});
+
+test('filterClients searches both name and address case-insensitively', () => {
+    const clients = [
+        { name: 'Alpha Print', address: '서울특별시 중구' },
+        { name: 'Beta Office', address: 'Busan Haeundae' },
+    ];
+
+    assert.deepEqual(filterClients(clients, 'alpha'), [clients[0]]);
+    assert.deepEqual(filterClients(clients, '해운'), []);
+    assert.deepEqual(filterClients(clients, 'BUSAN'), [clients[1]]);
+    assert.deepEqual(filterClients(clients, '서울'), [clients[0]]);
 });
 
 test('clusterByDistance keeps distant points separate', () => {
