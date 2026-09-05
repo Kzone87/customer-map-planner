@@ -55,5 +55,13 @@
         return clusters;
     }
 
-    window.GeoUtils = Object.freeze({ distanceMeters, clusterByDistance });
+    const api = Object.freeze({ distanceMeters, clusterByDistance });
+
+    if (typeof window !== 'undefined') {
+        window.GeoUtils = api;
+    }
+
+    if (typeof module !== 'undefined' && module.exports) {
+        module.exports = api;
+    }
 })();
