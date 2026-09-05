@@ -2,21 +2,26 @@ name: ci
 
 on:
   push:
-    branches: [ main, "test/**", "refactor/**" ]
+    branches: [ main, "feature/**", "refactor/**" ]
   pull_request:
     branches: [ main ]
 
+permissions:
+  contents: read
+
 jobs:
-  test:
+  verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Syntax check
-        run: |
-          node --check geo.js
-          node --check app.js
-      - name: Run geospatial regression tests
-        run: node --test
+          cache: npm
+      - name: Install
+        run: npm install
+      - name: Test
+        run: npm test
+      - name: Type-check and build
+        run: npm run build
