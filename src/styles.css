@@ -138,7 +138,10 @@ th { position: sticky; top: 0; z-index: 2; background: #f8fafc; color: #475569; 
 .quality-panel { margin-top: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: white; }
 .quality-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
 .quality-header h2 { margin: 0; font-size: 14px; }
-.quality-header select { width: 190px; }
+.quality-copy { margin: 5px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
+.quality-controls { display: flex; align-items: center; gap: 7px; flex-shrink: 0; }
+.quality-controls select { width: 190px; }
+.quality-controls button { white-space: nowrap; }
 .quality-list { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; max-height: 240px; overflow: auto; }
 .issue { display: flex; justify-content: space-between; gap: 10px; padding: 9px 10px; border: 1px solid #e6eaf0; border-radius: 9px; background: #fbfcfe; font-size: 11px; }
 .issue strong { color: #334155; }
@@ -162,5 +165,7 @@ th { position: sticky; top: 0; z-index: 2; background: #f8fafc; color: #475569; 
   .workspace-toolbar, .workspace-footer, .quality-header { align-items: stretch; flex-direction: column; }
   .toolbar-actions { flex-wrap: wrap; }
   .toolbar-actions input { width: 100%; }
+  .quality-controls { width: 100%; flex-wrap: wrap; }
+  .quality-controls select, .quality-controls button { flex: 1 1 180px; width: auto; }
   .quality-list { grid-template-columns: 1fr; }
 }
