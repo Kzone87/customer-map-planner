@@ -1,95 +1,130 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Excel 거래처 목록을 Kakao Maps에 지오코딩하고 근접 거래처를 클러스터링해 A4 지도로 출력하는 브라우저 업무 도구">
-    <title>Customer Map Planner</title>
-    <link rel="stylesheet" href="./styles.css">
-    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script defer src="./geo.js"></script>
-    <script defer src="./app.js"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="API 키와 서버 없이 Excel/CSV 데이터를 검증, 정리, 중복 제거, 변환하고 다시 내보내는 브라우저 업무 자동화 도구" />
+  <meta name="theme-color" content="#142033" />
+  <title>Customer Data Workbench</title>
 </head>
 <body>
-<header class="app-header">
-    <div>
-        <p class="eyebrow">BROWSER WORKFLOW AUTOMATION</p>
-        <h1>Customer Map Planner</h1>
-        <p>Excel 거래처 데이터를 지도에 배치하고 클러스터링하여 A4로 출력하는 업무 도구</p>
+  <header class="app-header">
+    <div class="brand">
+      <span class="brand-mark">CD</span>
+      <div>
+        <h1>Customer Data Workbench</h1>
+        <p>Local-first Excel / CSV workflow automation</p>
+      </div>
     </div>
     <div id="status" class="status" role="status" aria-live="polite"></div>
-</header>
+  </header>
 
-<div id="measure-box" aria-hidden="true"></div>
+  <div class="shell">
+    <aside class="sidebar">
+      <section class="card">
+        <p class="eyebrow">01 · IMPORT</p>
+        <h2>업무 데이터 불러오기</h2>
+        <div class="file-drop">
+          <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" />
+          <button id="sampleButton" type="button">샘플 데이터 다시 불러오기</button>
+        </div>
+        <p id="sourceName" class="source-name"></p>
+        <p id="sourceMeta" class="source-meta"></p>
+        <p class="muted">파일은 브라우저 안에서만 처리하며 서버로 업로드하지 않습니다.</p>
+      </section>
 
-<main class="wrapper">
-    <aside class="panel" aria-label="지도 설정">
-        <section class="box">
-            <div class="section-title-row">
-                <h2>1. 지도 활성화</h2>
-                <span class="step-badge">Kakao Maps</span>
-            </div>
-            <label for="apiKeyInput" class="hint">Kakao JavaScript 키</label>
-            <div class="row">
-                <input type="text" id="apiKeyInput" autocomplete="off" placeholder="Kakao JavaScript 키">
-                <button type="button" id="initMapButton">활성화</button>
-            </div>
+      <section class="card">
+        <p class="eyebrow">02 · CLEAN</p>
+        <h2>반복 정리 작업</h2>
+        <div class="button-grid">
+          <button id="trimButton" type="button">공백 정리</button>
+          <button id="emailButton" type="button">이메일 정리</button>
+          <button id="phoneButton" type="button">전화번호 정리</button>
+          <button id="dedupeButton" type="button">중복 제거</button>
+        </div>
+        <div class="button-grid" style="margin-top:7px">
+          <button id="undoButton" type="button">Undo</button>
+          <button id="redoButton" type="button">Redo</button>
+        </div>
+        <button id="resetButton" class="danger full" type="button">원본으로 복원</button>
+      </section>
 
-            <div class="field-grid">
-                <div>
-                    <label for="originAddressInput" class="hint">기준 주소 (선택)</label>
-                    <input type="text" id="originAddressInput" placeholder="예: 서울특별시 중구 세종대로 110">
-                </div>
-                <div>
-                    <label for="clusterDistanceInput" class="hint">클러스터 거리 (m)</label>
-                    <input type="number" id="clusterDistanceInput" min="100" max="10000" step="100" value="1000">
-                </div>
-            </div>
-            <p class="hint">키와 기준 주소는 저장소에 저장하지 않습니다. Kakao Developers에서 사용 도메인을 제한해 사용하세요.</p>
-        </section>
+      <section class="card">
+        <p class="eyebrow">03 · RECIPE</p>
+        <h2>반복 업무 저장</h2>
+        <div class="recipe-row">
+          <input id="recipeName" placeholder="예: 월간 거래처 정리" maxlength="40" />
+          <button id="saveRecipeButton" class="primary" type="button">현재 작업순서 저장</button>
+          <select id="recipeSelect" aria-label="저장된 Recipe"></select>
+          <button id="runRecipeButton" type="button">선택 Recipe 실행</button>
+        </div>
+      </section>
 
-        <section class="box">
-            <div class="section-title-row">
-                <h2>2. 거래처 데이터 불러오기</h2>
-                <span class="step-badge">Browser only</span>
-            </div>
-            <input type="file" id="excelFile" accept=".xlsx,.xls">
-            <div class="action-row">
-                <button type="button" id="loadSampleButton" class="secondary">샘플 거래처 불러오기</button>
-            </div>
-            <p class="hint">첫 번째 시트에 <strong>거래처명</strong>, <strong>주소</strong> 컬럼이 필요합니다. 빈 행과 완전 중복 행은 자동 제외합니다.</p>
-        </section>
-
-        <section class="box">
-            <div class="section-title-row">
-                <h2>3. 거래처 선택</h2>
-                <button type="button" id="selectAllButton" class="text-button">현재 목록 선택</button>
-            </div>
-            <input type="text" id="searchInput" placeholder="거래처명 검색" autocomplete="off">
-            <div id="searchList" class="list"></div>
-        </section>
-
-        <section class="box">
-            <div class="section-title-row">
-                <h2>4. 지도 표시 목록</h2>
-                <button type="button" id="clearSelectedButton" class="text-button danger-text">선택 비우기</button>
-            </div>
-            <div id="selectedList" class="list"></div>
-            <button type="button" id="printButton" class="print">A4 가로 인쇄</button>
-        </section>
+      <section class="card">
+        <p class="eyebrow">HISTORY</p>
+        <h2>현재 변환 순서</h2>
+        <div id="operationList" class="operation-list"></div>
+      </section>
     </aside>
 
-    <section id="map-wrap" aria-label="거래처 지도">
-        <div id="map">
-            <div class="map-placeholder">
-                <strong>지도 미활성화</strong>
-                <span>왼쪽에서 Kakao JavaScript 키를 입력하고 지도를 활성화하세요.</span>
-                <span>샘플 거래처는 키 없이도 먼저 불러와 선택 흐름을 확인할 수 있습니다.</span>
-            </div>
+    <main class="main">
+      <section class="metrics" aria-label="데이터 품질 요약">
+        <article class="metric"><span>Rows</span><strong id="rowCount">0</strong></article>
+        <article class="metric"><span>Columns</span><strong id="columnCount">0</strong></article>
+        <article class="metric"><span>Quality Issues</span><strong id="issueCount">0</strong></article>
+        <article class="metric"><span>Duplicates</span><strong id="duplicateCount">0</strong></article>
+      </section>
+
+      <section class="workspace">
+        <div class="workspace-toolbar">
+          <div>
+            <p class="eyebrow">DATA PREVIEW</p>
+            <h2>가져온 데이터를 바로 확인하고 정리합니다.</h2>
+            <p>검색은 모든 컬럼을 대상으로 하며 최대 50행씩 표시합니다.</p>
+          </div>
+          <div class="toolbar-actions">
+            <input id="searchInput" type="search" placeholder="전체 컬럼 검색" />
+            <button id="exportCsvButton" type="button">CSV Export</button>
+            <button id="exportXlsxButton" class="primary" type="button">Excel Export</button>
+          </div>
         </div>
-        <canvas id="line-canvas"></canvas>
-        <div id="label-canvas"></div>
-    </section>
-</main>
+
+        <div class="table-wrap">
+          <table>
+            <thead id="tableHead"></thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+
+        <div class="workspace-footer">
+          <p class="muted">원본은 메모리에 유지되므로 언제든 초기 상태로 되돌릴 수 있습니다.</p>
+          <div class="pager">
+            <button id="prevPage" type="button">이전</button>
+            <span id="pageLabel"></span>
+            <button id="nextPage" type="button">다음</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="quality-panel">
+        <div class="quality-header">
+          <div>
+            <p class="eyebrow">QUALITY REVIEW</p>
+            <h2>빈 값 · 이메일 · 전화번호 · 중복을 자동 점검합니다.</h2>
+          </div>
+          <select id="issueFilter" aria-label="문제 유형 필터">
+            <option value="all">전체 문제</option>
+            <option value="blank">빈 값</option>
+            <option value="email">이메일</option>
+            <option value="phone">전화번호</option>
+            <option value="duplicate">중복</option>
+          </select>
+        </div>
+        <div id="qualityList" class="quality-list"></div>
+      </section>
+    </main>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
