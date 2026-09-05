@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Excel/CSV 원본 컬럼을 표준 컬럼으로 안전하게 매핑하는 API-free browser workspace" />
+  <title>Column Mapping · Customer Data Workbench</title>
+</head>
+<body>
+  <header class="mapping-header">
+    <div><p>Customer Data Workbench · V2.4</p><h1>Column Mapping Workspace</h1><span>서로 다른 Excel 컬럼을 표준 데이터 구조로 바꿉니다.</span></div>
+    <a href="./">← Data Workbench</a>
+  </header>
+  <main class="mapping-shell">
+    <section class="mapping-card controls">
+      <h2>1. 데이터 불러오기</h2>
+      <input id="mappingFile" type="file" accept=".xlsx,.xls,.csv" />
+      <button id="mappingSample" type="button">샘플 데이터</button>
+      <p id="mappingSource"></p>
+    </section>
+    <section class="mapping-card controls">
+      <h2>2. 컬럼 규칙 만들기</h2>
+      <select id="mappingSourceColumn"></select>
+      <input id="mappingTargetColumn" placeholder="표준 컬럼명 예: company" maxlength="120" />
+      <button id="mappingAdd" class="primary" type="button">매핑 추가</button>
+      <div id="mappingList"></div>
+      <div class="mapping-actions"><button id="mappingApply" class="primary" type="button">매핑 적용</button><button id="mappingReset" type="button">원본 복원</button></div>
+      <p id="mappingStatus" role="status"></p>
+    </section>
+    <section class="mapping-card preview">
+      <div class="preview-head"><div><h2>3. 결과 미리보기</h2><p id="mappingMeta"></p></div><div><button id="mappingCsv" type="button">CSV Export</button><button id="mappingXlsx" class="primary" type="button">Excel Export</button></div></div>
+      <div class="mapping-table"><table><thead id="mappingHead"></thead><tbody id="mappingBody"></tbody></table></div>
+    </section>
+  </main>
+  <script type="module" src="/src/mapping-main.ts"></script>
+</body>
+</html>
