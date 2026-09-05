@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Excel 거래처 목록을 Kakao Maps에 지오코딩하고 근접 거래처를 클러스터링해 A4 지도로 출력하는 브라우저 업무 도구">
     <title>Customer Map Planner</title>
     <link rel="stylesheet" href="./styles.css">
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -12,6 +13,7 @@
 <body>
 <header class="app-header">
     <div>
+        <p class="eyebrow">BROWSER WORKFLOW AUTOMATION</p>
         <h1>Customer Map Planner</h1>
         <p>Excel 거래처 데이터를 지도에 배치하고 클러스터링하여 A4로 출력하는 업무 도구</p>
     </div>
@@ -23,38 +25,68 @@
 <main class="wrapper">
     <aside class="panel" aria-label="지도 설정">
         <section class="box">
-            <h2>1. 지도 활성화</h2>
+            <div class="section-title-row">
+                <h2>1. 지도 활성화</h2>
+                <span class="step-badge">Kakao Maps</span>
+            </div>
             <label for="apiKeyInput" class="hint">Kakao JavaScript 키</label>
             <div class="row">
                 <input type="text" id="apiKeyInput" autocomplete="off" placeholder="Kakao JavaScript 키">
                 <button type="button" id="initMapButton">활성화</button>
             </div>
-            <label for="originAddressInput" class="hint">기준 주소 (선택)</label>
-            <input type="text" id="originAddressInput" placeholder="예: 서울특별시 중구 세종대로 110">
+
+            <div class="field-grid">
+                <div>
+                    <label for="originAddressInput" class="hint">기준 주소 (선택)</label>
+                    <input type="text" id="originAddressInput" placeholder="예: 서울특별시 중구 세종대로 110">
+                </div>
+                <div>
+                    <label for="clusterDistanceInput" class="hint">클러스터 거리 (m)</label>
+                    <input type="number" id="clusterDistanceInput" min="100" max="10000" step="100" value="1000">
+                </div>
+            </div>
             <p class="hint">키와 기준 주소는 저장소에 저장하지 않습니다. Kakao Developers에서 사용 도메인을 제한해 사용하세요.</p>
         </section>
 
         <section class="box">
-            <h2>2. 거래처 Excel 불러오기</h2>
+            <div class="section-title-row">
+                <h2>2. 거래처 데이터 불러오기</h2>
+                <span class="step-badge">Browser only</span>
+            </div>
             <input type="file" id="excelFile" accept=".xlsx,.xls">
+            <div class="action-row">
+                <button type="button" id="loadSampleButton" class="secondary">샘플 거래처 불러오기</button>
+            </div>
             <p class="hint">첫 번째 시트에 <strong>거래처명</strong>, <strong>주소</strong> 컬럼이 필요합니다. 빈 행과 완전 중복 행은 자동 제외합니다.</p>
         </section>
 
         <section class="box">
-            <h2>3. 거래처 검색</h2>
+            <div class="section-title-row">
+                <h2>3. 거래처 선택</h2>
+                <button type="button" id="selectAllButton" class="text-button">전체 선택</button>
+            </div>
             <input type="text" id="searchInput" placeholder="거래처명 검색" autocomplete="off">
             <div id="searchList" class="list"></div>
         </section>
 
         <section class="box">
-            <h2>4. 지도 표시 목록</h2>
+            <div class="section-title-row">
+                <h2>4. 지도 표시 목록</h2>
+                <button type="button" id="clearSelectedButton" class="text-button danger-text">선택 비우기</button>
+            </div>
             <div id="selectedList" class="list"></div>
             <button type="button" id="printButton" class="print">A4 가로 인쇄</button>
         </section>
     </aside>
 
     <section id="map-wrap" aria-label="거래처 지도">
-        <div id="map"></div>
+        <div id="map">
+            <div class="map-placeholder">
+                <strong>지도 미활성화</strong>
+                <span>왼쪽에서 Kakao JavaScript 키를 입력하고 지도를 활성화하세요.</span>
+                <span>샘플 거래처는 키 없이도 먼저 불러와 선택 흐름을 확인할 수 있습니다.</span>
+            </div>
+        </div>
         <canvas id="line-canvas"></canvas>
         <div id="label-canvas"></div>
     </section>
