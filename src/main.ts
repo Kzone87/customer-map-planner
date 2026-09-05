@@ -15,6 +15,11 @@ import {
   profileRows,
   SAMPLE_ROWS
 } from './data';
+import {
+  buildIssueReportRows,
+  exportIssueReportCsv,
+  IssueFilter
+} from './report';
 
 type Snapshot = {
   rows: DataRow[];
@@ -39,7 +44,7 @@ const state = {
   operations: [] as Operation[],
   query: '',
   page: 0,
-  issueFilter: 'all' as 'all' | 'blank' | 'email' | 'phone' | 'duplicate'
+  issueFilter: 'all' as IssueFilter
 };
 
 function byId<T extends HTMLElement>(id: string): T {
@@ -67,7 +72,8 @@ const elements = {
   pageLabel: byId<HTMLElement>('pageLabel'),
   recipeName: byId<HTMLInputElement>('recipeName'),
   recipeSelect: byId<HTMLSelectElement>('recipeSelect'),
-  issueFilter: byId<HTMLSelectElement>('issueFilter')
+  issueFilter: byId<HTMLSelectElement>('issueFilter'),
+  issueReport: byId<HTMLButtonElement>('issueReportButton')
 };
 
 function cloneRows(rows: DataRow[]): DataRow[] {
@@ -221,9 +227,9 @@ function renderQuality(profile: DataProfile) {
   elements.duplicateCount.textContent = profile.duplicateRows.toLocaleString();
 
   const filter = state.issueFilter;
-  const issues = profile.issues
-    .filter((issue) => filter === 'all' || issue.type === filter)
-    .slice(0, 80);
+  const filteredIssues = profile.issues.filter((issue) => filter === 'all' || issue.type === filter);
+  elements.issueReport.disabled = filteredIssues.length === 0;
+  const issues = filteredIssues.slice(0, 80);
 
   if (issues.length === 0) {
     const empty = document.createElement('p');
@@ -383,6 +389,21 @@ function runRecipe() {
   setStatus(`Recipe “${recipe.name}” ${recipe.operations.length}단계를 적용했습니다.`, 'success');
 }
 
+function exportIssueReport() {
+  const profile = profileRows(state.rows);
+  const reportRows = buildIssueReportRows(state.rows, profile, state.issueFilter);
+  if (reportRows.length === 0) {
+    setStatus('현재 필터에서 내보낼 품질 문제가 없습니다.', 'error');
+    return;
+  }
+
+  download(
+    exportIssueReportCsv(state.rows, profile, state.issueFilter),
+    `quality-issues-${state.issueFilter}.csv`
+  );
+  setStatus(`품질 검수 리포트 ${reportRows.length.toLocaleString()}건을 CSV로 내보냈습니다.`, 'success');
+}
+
 elements.file.addEventListener('change', () => void handleFile());
 byId<HTMLButtonElement>('sampleButton').addEventListener('click', () => loadRows(SAMPLE_ROWS, '샘플 거래처 데이터'));
 byId<HTMLButtonElement>('trimButton').addEventListener('click', () => runOperation('trim'));
@@ -396,13 +417,14 @@ byId<HTMLButtonElement>('saveRecipeButton').addEventListener('click', saveRecipe
 byId<HTMLButtonElement>('runRecipeButton').addEventListener('click', runRecipe);
 byId<HTMLButtonElement>('exportCsvButton').addEventListener('click', () => download(exportCsv(state.rows), 'cleaned-data.csv'));
 byId<HTMLButtonElement>('exportXlsxButton').addEventListener('click', () => download(exportXlsx(state.rows), 'cleaned-data.xlsx'));
+elements.issueReport.addEventListener('click', exportIssueReport);
 elements.search.addEventListener('input', () => {
   state.query = elements.search.value;
   state.page = 0;
   render();
 });
 elements.issueFilter.addEventListener('change', () => {
-  state.issueFilter = elements.issueFilter.value as typeof state.issueFilter;
+  state.issueFilter = elements.issueFilter.value as IssueFilter;
   render();
 });
 elements.prev.addEventListener('click', () => {
