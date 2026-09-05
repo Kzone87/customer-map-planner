@@ -2,520 +2,62 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>거래처 관리 및 출력 지도</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <style>
-        body { font-family: 'Malgun Gothic', sans-serif; padding: 10px; background: #f5f5f5; }
-        .wrapper { display: flex; gap: 20px; }
-        .panel { width: 350px; flex-shrink: 0; }
-        #map { width: 1122px; height: 794px; border: 2px solid #333; }
-
-        .box { background: #fff; border: 1px solid #ddd; padding: 12px; margin-bottom: 10px; border-radius: 6px; }
-        .box h3 { font-size: 13px; color: #333; margin-bottom: 8px; }
-        #searchList, #selectedList { height: 200px; overflow-y: auto; border: 1px solid #eee; margin-top: 5px; padding: 5px; border-radius: 4px; }
-        input[type=text] { border: 1px solid #ccc; border-radius: 4px; padding: 5px 8px; font-family: inherit; font-size: 13px; }
-        button { cursor: pointer; background: #007bff; color: white; border: none; padding: 5px 10px; border-radius: 4px; font-family: inherit; font-size: 12px; }
-        button.del { background: #dc3545; }
-
-        #measure-box { position: fixed; top: -9999px; left: -9999px; visibility: hidden; }
-        #label-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
-
-        /* 라벨 기본 스타일 */
-        .lbl {
-            position: absolute;
-            color: #1a1a1a;
-            font-size: 11.5px;
-            font-weight: 700;
-            font-family: 'Malgun Gothic', sans-serif;
-            white-space: nowrap;
-            line-height: 1.55;
-            background: rgba(255,255,255,0.92);
-            border: 1.5px solid rgba(80,80,80,0.35);
-            border-radius: 4px;
-            padding: 3px 6px;
-            box-shadow: 0 1px 4px rgba(0,0,0,0.15);
-        }
-        /* 긴 이름(10자+) 줄바꿈 허용 */
-        .lbl.wrap {
-            white-space: normal;
-            max-width: 130px;
-            word-break: keep-all;
-        }
-        /* 클러스터(여러 업체) 라벨 */
-        .lbl.cluster {
-            white-space: normal;
-            max-width: 150px;
-            word-break: keep-all;
-        }
-
-        @media print {
-            @page { size: A4 landscape; margin: 0; }
-            html, body { margin: 0; padding: 0; overflow: hidden; background: #fff; }
-            .panel { display: none !important; }
-            .wrapper { display: block; margin: 0; padding: 0; }
-            #map-wrap {
-                position: fixed !important;
-                top: 0 !important; left: 0 !important;
-                width: 297mm !important; height: 210mm !important;
-            }
-            #map { width: 297mm !important; height: 210mm !important; border: none !important; }
-            #line-canvas, #label-canvas { width: 297mm !important; height: 210mm !important; }
-        }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Map Planner</title>
+    <link rel="stylesheet" href="./styles.css">
+    <script defer src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script defer src="./geo.js"></script>
+    <script defer src="./app.js"></script>
 </head>
 <body>
-<div id="measure-box"></div>
+<header class="app-header">
+    <div>
+        <h1>Customer Map Planner</h1>
+        <p>Excel 거래처 데이터를 지도에 배치하고 클러스터링하여 A4로 출력하는 업무 도구</p>
+    </div>
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+</header>
 
-<div class="wrapper">
-    <div class="panel">
-        <div class="box">
-            <h3>① API 키 입력</h3>
-            <input type="text" id="apiKeyInput" placeholder="카카오 JS 키" style="width:180px">
-            <button onclick="initMap()">활성화</button>
-            <p id="keyStatus" style="color:red;font-size:12px;margin-top:6px;">(미활성화)</p>
-        </div>
-        <div class="box">
-            <h3>② 파일 업로드</h3>
+<div id="measure-box" aria-hidden="true"></div>
+
+<main class="wrapper">
+    <aside class="panel" aria-label="지도 설정">
+        <section class="box">
+            <h2>1. 지도 활성화</h2>
+            <label for="apiKeyInput" class="hint">Kakao JavaScript 키</label>
+            <div class="row">
+                <input type="text" id="apiKeyInput" autocomplete="off" placeholder="Kakao JavaScript 키">
+                <button type="button" id="initMapButton">활성화</button>
+            </div>
+            <label for="originAddressInput" class="hint">기준 주소 (선택)</label>
+            <input type="text" id="originAddressInput" placeholder="예: 서울특별시 중구 세종대로 110">
+            <p class="hint">키와 기준 주소는 저장소에 저장하지 않습니다. Kakao Developers에서 사용 도메인을 제한해 사용하세요.</p>
+        </section>
+
+        <section class="box">
+            <h2>2. 거래처 Excel 불러오기</h2>
             <input type="file" id="excelFile" accept=".xlsx,.xls">
-        </div>
-        <div class="box">
-            <h3>③ 거래처 검색</h3>
-            <input type="text" id="searchInput" placeholder="업체명 검색..." style="width:100%">
-            <div id="searchList"></div>
-        </div>
-        <div class="box">
-            <h3>④ 표시 목록</h3>
-            <div id="selectedList"></div>
-            <button onclick="window.print()" style="margin-top:10px;background:#28a745;width:100%;padding:8px;">🖨 A4 인쇄</button>
-        </div>
-    </div>
+            <p class="hint">첫 번째 시트에 <strong>거래처명</strong>, <strong>주소</strong> 컬럼이 필요합니다. 빈 행과 완전 중복 행은 자동 제외합니다.</p>
+        </section>
 
-    <div id="map-wrap" style="position:relative;flex-shrink:0;">
+        <section class="box">
+            <h2>3. 거래처 검색</h2>
+            <input type="text" id="searchInput" placeholder="거래처명 검색" autocomplete="off">
+            <div id="searchList" class="list"></div>
+        </section>
+
+        <section class="box">
+            <h2>4. 지도 표시 목록</h2>
+            <div id="selectedList" class="list"></div>
+            <button type="button" id="printButton" class="print">A4 가로 인쇄</button>
+        </section>
+    </aside>
+
+    <section id="map-wrap" aria-label="거래처 지도">
         <div id="map"></div>
-        <canvas id="line-canvas" style="position:absolute;top:0;left:0;pointer-events:none;z-index:9;"></canvas>
+        <canvas id="line-canvas"></canvas>
         <div id="label-canvas"></div>
-    </div>
-</div>
-
-<script>
-let map, geocoder;
-let allData = [], selectedData = [];
-let placed = [];
-let reposTimer = null;
-let myCompanyPos = null;
-
-const MY_COMPANY_ADDR = '경기 수원시 영통구 신원로 55';
-const MARKER_R  = 6;
-const GAP       = 10;   // 마커 오른쪽 끝 → 라벨 왼쪽 간격
-const PAD       = 6;    // 라벨 간 여백
-const CLUSTER_D = 1000; // ★ 1km 이내 묶음
-
-// ── 초기화 ────────────────────────────────────────────
-function initMap() {
-    const key = document.getElementById('apiKeyInput').value.trim();
-    if (!key) { alert("API 키를 입력하세요."); return; }
-    const script = document.createElement('script');
-    script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${key}&libraries=services&autoload=false`;
-    script.onload = () => {
-        kakao.maps.load(() => {
-            map = new kakao.maps.Map(document.getElementById('map'), {
-                center: new kakao.maps.LatLng(37.2636, 127.0286),
-                level: 9
-            });
-            geocoder = new kakao.maps.services.Geocoder();
-            kakao.maps.event.addListener(map, 'idle', scheduleRepos);
-            document.getElementById('keyStatus').innerText = "✅ 활성화 완료";
-            document.getElementById('keyStatus').style.color = "green";
-            geocoder.addressSearch(MY_COMPANY_ADDR, (result, status) => {
-                if (status === kakao.maps.services.Status.OK) {
-                    myCompanyPos = new kakao.maps.LatLng(result[0].y, result[0].x);
-                    map.setCenter(myCompanyPos);
-                    placeMyMarker();
-                }
-            });
-        });
-    };
-    document.head.appendChild(script);
-}
-
-// ── 마커 이미지 생성 ──────────────────────────────────
-function makeMarkerImg(color, withDot) {
-    const size = (MARKER_R + 2) * 2;
-    const c = document.createElement('canvas');
-    c.width = c.height = size;
-    const ctx = c.getContext('2d');
-    ctx.beginPath(); ctx.arc(size/2, size/2, MARKER_R+1, 0, Math.PI*2);
-    ctx.fillStyle = '#fff'; ctx.fill();
-    ctx.beginPath(); ctx.arc(size/2, size/2, MARKER_R, 0, Math.PI*2);
-    ctx.fillStyle = color; ctx.fill();
-    if (withDot) {
-        ctx.beginPath(); ctx.arc(size/2, size/2, 2.5, 0, Math.PI*2);
-        ctx.fillStyle = '#fff'; ctx.fill();
-    }
-    return c.toDataURL();
-}
-
-function kakaoMarkerImage(dataUrl) {
-    const s = (MARKER_R+2)*2;
-    return new kakao.maps.MarkerImage(
-        dataUrl, new kakao.maps.Size(s, s),
-        { offset: new kakao.maps.Point(s/2, s/2) }
-    );
-}
-
-function placeMyMarker() {
-    if (!myCompanyPos) return;
-    new kakao.maps.Marker({
-        map, position: myCompanyPos,
-        image: kakaoMarkerImage(makeMarkerImg('#1971c2', true)),
-        zIndex: 10
-    });
-}
-
-// ── 파일 업로드 ───────────────────────────────────────
-document.getElementById('excelFile').onchange = e => {
-    const reader = new FileReader();
-    reader.onload = ev => {
-        const wb = XLSX.read(ev.target.result, { type: 'array' });
-        allData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-        alert(`✅ 로드 완료 — 총 ${allData.length}개 거래처`);
-    };
-    reader.readAsArrayBuffer(e.target.files[0]);
-};
-
-// ── 검색 ──────────────────────────────────────────────
-document.getElementById('searchInput').oninput = e => {
-    const val = e.target.value;
-    const list = document.getElementById('searchList');
-    list.innerHTML = '';
-    if (!val) return;
-    allData.filter(d => d['거래처명'] && d['거래처명'].includes(val))
-        .forEach(d => {
-            const idx = allData.indexOf(d);
-            const div = document.createElement('div');
-            div.style.cssText = "margin-bottom:5px;font-size:12px;";
-            div.innerHTML = `<button onclick="addItem(${idx})" style="padding:2px 7px;font-size:11px;">+</button> ${d['거래처명']}`;
-            list.appendChild(div);
-        });
-};
-
-function addItem(idx) {
-    const d = allData[idx];
-    if (!selectedData.find(x => x['거래처명'] === d['거래처명'])) {
-        selectedData.push(d);
-        renderSelectedList();
-        updateMap();
-    }
-}
-function removeItem(idx) {
-    selectedData.splice(idx, 1);
-    renderSelectedList();
-    updateMap();
-}
-function renderSelectedList() {
-    const list = document.getElementById('selectedList');
-    list.innerHTML = '';
-    selectedData.forEach((d, i) => {
-        const div = document.createElement('div');
-        div.style.cssText = "margin-bottom:5px;font-size:12px;";
-        div.innerHTML = `<button class="del" onclick="removeItem(${i})" style="padding:2px 6px;font-size:11px;">✕</button> ${d['거래처명']}`;
-        list.appendChild(div);
-    });
-}
-
-// ── 라벨 크기 측정 ────────────────────────────────────
-function measureLabel(names) {
-    const mb = document.getElementById('measure-box');
-    const el = document.createElement('div');
-
-    if (names.length === 1) {
-        el.className = names[0].length > 10 ? 'lbl wrap' : 'lbl';
-        el.style.position = 'static';
-        el.textContent = names[0];
-    } else {
-        el.className = 'lbl cluster';
-        el.style.position = 'static';
-        names.forEach((n, i) => {
-            const row = document.createElement('div');
-            row.textContent = (i === 0 ? '● ' : '· ') + n;
-            el.appendChild(row);
-        });
-    }
-
-    mb.appendChild(el);
-    const w = el.offsetWidth, h = el.offsetHeight;
-    mb.removeChild(el);
-    return { w, h };
-}
-
-// ── 거리 계산 (m) ─────────────────────────────────────
-function distM(lat1, lng1, lat2, lng2) {
-    const R = 6371000;
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLng = (lng2 - lng1) * Math.PI / 180;
-    const a = Math.sin(dLat/2)**2 +
-              Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLng/2)**2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-}
-
-// ── 지도 업데이트 ─────────────────────────────────────
-function updateMap() {
-    if (!map) { alert("먼저 지도를 활성화하세요."); return; }
-    placed.forEach(p => p.marker.setMap(null));
-    placed = [];
-    clearCanvas();
-    if (selectedData.length === 0) return;
-
-    const redImg = kakaoMarkerImage(makeMarkerImg('#e63946', false));
-    const bounds = new kakao.maps.LatLngBounds();
-    if (myCompanyPos) bounds.extend(myCompanyPos);
-
-    let pending = selectedData.length;
-    const results = [];
-
-    selectedData.forEach(d => {
-        geocoder.addressSearch(d['주소'], (result, status) => {
-            if (status === kakao.maps.services.Status.OK) {
-                results.push({ name: d['거래처명'], lat: +result[0].y, lng: +result[0].x });
-            }
-            pending--;
-            if (pending === 0) buildMarkers(results, redImg, bounds);
-        });
-    });
-}
-
-function buildMarkers(results, redImg, bounds) {
-    // ── 1km 이내 클러스터링 ──────────────────────────
-    const used = new Array(results.length).fill(false);
-    const clusters = [];
-
-    for (let i = 0; i < results.length; i++) {
-        if (used[i]) continue;
-        const group = [results[i]];
-        used[i] = true;
-        for (let j = i+1; j < results.length; j++) {
-            if (!used[j] && distM(results[i].lat, results[i].lng, results[j].lat, results[j].lng) <= CLUSTER_D) {
-                group.push(results[j]);
-                used[j] = true;
-            }
-        }
-        const lat = group.reduce((s,r) => s + r.lat, 0) / group.length;
-        const lng = group.reduce((s,r) => s + r.lng, 0) / group.length;
-        clusters.push({ lat, lng, names: group.map(r => r.name) });
-    }
-
-    clusters.forEach(cl => {
-        const pos = new kakao.maps.LatLng(cl.lat, cl.lng);
-        const marker = new kakao.maps.Marker({ map, position: pos, image: redImg });
-        const { w, h } = measureLabel(cl.names);
-        placed.push({ marker, pos, names: cl.names, lw: w, lh: h });
-        bounds.extend(pos);
-    });
-
-    if (!bounds.isEmpty()) map.setBounds(bounds);
-    setTimeout(repositionLabels, 600);
-}
-
-// ── Canvas 초기화 ─────────────────────────────────────
-function clearCanvas() {
-    document.getElementById('label-canvas').innerHTML = '';
-    const lc = document.getElementById('line-canvas');
-    const mapEl = document.getElementById('map');
-    lc.width  = mapEl.offsetWidth;
-    lc.height = mapEl.offsetHeight;
-    lc.getContext('2d').clearRect(0, 0, lc.width, lc.height);
-}
-
-// ── 마커 → 컨테이너 픽셀 좌표 ───────────────────────
-function toPx(latLng) {
-    const proj = map.getProjection();
-    const mp   = proj.pointFromCoords(latLng);
-    const cp   = proj.pointFromCoords(map.getCenter());
-    const el   = document.getElementById('map');
-    return { x: el.offsetWidth/2 + (mp.x - cp.x), y: el.offsetHeight/2 + (mp.y - cp.y) };
-}
-
-function scheduleRepos() {
-    clearTimeout(reposTimer);
-    reposTimer = setTimeout(repositionLabels, 200);
-}
-
-// ── 클러스터 중심 계산 ────────────────────────────────
-function clusterCentroid(items) {
-    const cx = items.reduce((s,it) => s + it.mx, 0) / items.length;
-    const cy = items.reduce((s,it) => s + it.my, 0) / items.length;
-    return { cx, cy };
-}
-
-// ── 겹침 해소 + 렌더링 ───────────────────────────────
-function repositionLabels() {
-    if (!map || placed.length === 0) return;
-    clearCanvas();
-
-    const mapEl = document.getElementById('map');
-    const W = mapEl.offsetWidth, H = mapEl.offsetHeight;
-    const lc = document.getElementById('line-canvas');
-    lc.width = W; lc.height = H;
-
-    const items = placed.map(p => {
-        const { x, y } = toPx(p.pos);
-        return {
-            names: p.names,
-            mx: x, my: y,
-            lw: p.lw, lh: p.lh,
-            lx: x + MARKER_R + GAP,
-            ly: y - p.lh / 2,
-        };
-    });
-
-    const { cx: globalCx, cy: globalCy } = clusterCentroid(items);
-
-    function labelOverlap(a, b) {
-        return !(a.lx + a.lw + PAD < b.lx ||
-                 b.lx + b.lw + PAD < a.lx ||
-                 a.ly + a.lh + PAD < b.ly ||
-                 b.ly + b.lh + PAD < a.ly);
-    }
-
-    function labelHitsMarker(label, markerItem) {
-        const mr = MARKER_R + 3;
-        return !(label.lx + label.lw + PAD < markerItem.mx - mr ||
-                 markerItem.mx + mr + PAD  < label.lx ||
-                 label.ly + label.lh + PAD < markerItem.my - mr ||
-                 markerItem.my + mr + PAD  < label.ly);
-    }
-
-    function clusterOverlapScore(label) {
-        const allMx = items.map(it => it.mx);
-        const allMy = items.map(it => it.my);
-        const minMx = Math.min(...allMx) - MARKER_R;
-        const maxMx = Math.max(...allMx) + MARKER_R;
-        const minMy = Math.min(...allMy) - MARKER_R;
-        const maxMy = Math.max(...allMy) + MARKER_R;
-        const ox = Math.max(0, Math.min(label.lx + label.lw, maxMx) - Math.max(label.lx, minMx));
-        const oy = Math.max(0, Math.min(label.ly + label.lh, maxMy) - Math.max(label.ly, minMy));
-        return ox * oy;
-    }
-
-    const STEP    = 5;
-    const MAX_OX  = 320;
-    const Y_RANGE = 80;
-    const settled = [];
-
-    items.forEach(cur => {
-        const dyFromCenter = cur.my - globalCy;
-        const initYBias = dyFromCenter > 0 ? 10 : (dyFromCenter < 0 ? -10 : 0);
-        const baseX = cur.mx + MARKER_R + GAP;
-        const baseY = cur.my - cur.lh / 2 + initYBias;
-
-        let bestScore = Infinity;
-        let bestLx = baseX, bestLy = baseY;
-
-        for (let ox = 0; ox <= MAX_OX; ox += STEP) {
-            for (let absOy = 0; absOy <= Y_RANGE; absOy += STEP) {
-                const oyList = absOy === 0 ? [0] : [initYBias < 0 ? -absOy : absOy, initYBias < 0 ? absOy : -absOy];
-                for (const oy of oyList) {
-                    const testLx = baseX + ox;
-                    const testLy = baseY + oy;
-                    const testItem = { ...cur, lx: testLx, ly: testLy };
-
-                    if (settled.some(s => labelOverlap(testItem, s))) continue;
-                    if (items.some(other => other !== cur && labelHitsMarker(testItem, other))) continue;
-
-                    const score = clusterOverlapScore(testItem) + ox * 0.5;
-                    if (score < bestScore) {
-                        bestScore = score;
-                        bestLx = testLx;
-                        bestLy = testLy;
-                        if (score === ox * 0.5) { break; }
-                    }
-                }
-                if (bestScore === (ox * 0.5)) break;
-            }
-            if (bestScore === 0) break;
-        }
-
-        cur.lx = bestLx;
-        cur.ly = bestLy;
-        settled.push(cur);
-    });
-
-    // ── Canvas 연결선 (명확하게 강화) ───────────────────
-    const ctx = lc.getContext('2d');
-
-    settled.forEach(it => {
-        const labelLx = it.lx;
-        const labelLy = it.ly + it.lh / 2;
-        const mrkRx = it.mx + MARKER_R + 1;
-        const mrkRy = it.my;
-        const elbowX = it.lx - 6;
-
-        ctx.beginPath();
-        ctx.moveTo(mrkRx, mrkRy);
-
-        if (Math.abs(mrkRy - labelLy) < 4) {
-            ctx.lineTo(labelLx, labelLy);
-        } else {
-            ctx.lineTo(elbowX, mrkRy);
-            ctx.lineTo(elbowX, labelLy);
-            ctx.lineTo(labelLx, labelLy);
-        }
-
-        // 흰 배경 테두리선
-        ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-        ctx.lineWidth   = 4;
-        ctx.setLineDash([]);
-        ctx.stroke();
-
-        // 진한 점선
-        ctx.strokeStyle = 'rgba(30,30,30,0.75)';
-        ctx.lineWidth   = 1.8;
-        ctx.setLineDash([5, 3]);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        // 마커 접점 원
-        ctx.beginPath();
-        ctx.arc(mrkRx, mrkRy, 3.5, 0, Math.PI*2);
-        ctx.fillStyle = '#fff';
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(mrkRx, mrkRy, 2.5, 0, Math.PI*2);
-        ctx.fillStyle = 'rgba(30,30,30,0.8)';
-        ctx.fill();
-
-        // 라벨 접점 삼각형 화살표
-        ctx.beginPath();
-        ctx.moveTo(labelLx, labelLy);
-        ctx.lineTo(labelLx - 6, labelLy - 4);
-        ctx.lineTo(labelLx - 6, labelLy + 4);
-        ctx.closePath();
-        ctx.fillStyle = 'rgba(30,30,30,0.7)';
-        ctx.fill();
-    });
-
-    // ── 라벨 DOM ─────────────────────────────────────
-    const canvas = document.getElementById('label-canvas');
-    settled.forEach(it => {
-        const el = document.createElement('div');
-
-        if (it.names.length === 1) {
-            el.className = it.names[0].length > 10 ? 'lbl wrap' : 'lbl';
-            el.textContent = it.names[0];
-        } else {
-            el.className = 'lbl cluster';
-            it.names.forEach((n, i) => {
-                const row = document.createElement('div');
-                row.textContent = (i === 0 ? '● ' : '· ') + n;
-                el.appendChild(row);
-            });
-        }
-
-        el.style.left = it.lx + 'px';
-        el.style.top  = it.ly + 'px';
-        canvas.appendChild(el);
-    });
-}
-</script>
+    </section>
+</main>
 </body>
 </html>
