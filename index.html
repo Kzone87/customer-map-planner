@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="API 키와 서버 없이 Excel/CSV 데이터를 검증, 정리, 중복 제거, 변환하고 품질 검수 리포트까지 내보내는 브라우저 업무 자동화 도구" />
+  <meta name="description" content="API 키와 서버 없이 Excel/CSV 데이터를 검증, 정리, 규칙 검사하고 검수 리포트까지 내보내는 브라우저 업무 자동화 도구" />
   <meta name="theme-color" content="#142033" />
   <title>Customer Data Workbench</title>
 </head>
@@ -11,10 +11,7 @@
   <header class="app-header">
     <div class="brand">
       <span class="brand-mark">CD</span>
-      <div>
-        <h1>Customer Data Workbench</h1>
-        <p>Local-first Excel / CSV workflow automation</p>
-      </div>
+      <div><h1>Customer Data Workbench</h1><p>Local-first Excel / CSV workflow automation</p></div>
     </div>
     <div id="status" class="status" role="status" aria-live="polite"></div>
   </header>
@@ -22,49 +19,37 @@
   <div class="shell">
     <aside class="sidebar">
       <section class="card">
-        <p class="eyebrow">01 · IMPORT</p>
-        <h2>업무 데이터 불러오기</h2>
-        <div class="file-drop">
-          <input id="fileInput" type="file" accept=".xlsx,.xls,.csv" />
-          <button id="sampleButton" type="button">샘플 데이터 다시 불러오기</button>
-        </div>
-        <p id="sourceName" class="source-name"></p>
-        <p id="sourceMeta" class="source-meta"></p>
+        <p class="eyebrow">01 · IMPORT</p><h2>업무 데이터 불러오기</h2>
+        <div class="file-drop"><input id="fileInput" type="file" accept=".xlsx,.xls,.csv" /><button id="sampleButton" type="button">샘플 데이터 다시 불러오기</button></div>
+        <p id="sourceName" class="source-name"></p><p id="sourceMeta" class="source-meta"></p>
         <p class="muted">파일은 브라우저 안에서만 처리하며 서버로 업로드하지 않습니다.</p>
       </section>
 
       <section class="card">
-        <p class="eyebrow">02 · CLEAN</p>
-        <h2>반복 정리 작업</h2>
-        <div class="button-grid">
-          <button id="trimButton" type="button">공백 정리</button>
-          <button id="emailButton" type="button">이메일 정리</button>
-          <button id="phoneButton" type="button">전화번호 정리</button>
-          <button id="dedupeButton" type="button">중복 제거</button>
-        </div>
-        <div class="button-grid" style="margin-top:7px">
-          <button id="undoButton" type="button">Undo</button>
-          <button id="redoButton" type="button">Redo</button>
-        </div>
+        <p class="eyebrow">02 · CLEAN</p><h2>반복 정리 작업</h2>
+        <div class="button-grid"><button id="trimButton" type="button">공백 정리</button><button id="emailButton" type="button">이메일 정리</button><button id="phoneButton" type="button">전화번호 정리</button><button id="dedupeButton" type="button">중복 제거</button></div>
+        <div class="button-grid" style="margin-top:7px"><button id="undoButton" type="button">Undo</button><button id="redoButton" type="button">Redo</button></div>
         <button id="resetButton" class="danger full" type="button">원본으로 복원</button>
       </section>
 
       <section class="card">
-        <p class="eyebrow">03 · RECIPE</p>
-        <h2>반복 업무 저장</h2>
-        <div class="recipe-row">
-          <input id="recipeName" placeholder="예: 월간 거래처 정리" maxlength="40" />
-          <button id="saveRecipeButton" class="primary" type="button">현재 작업순서 저장</button>
-          <select id="recipeSelect" aria-label="저장된 Recipe"></select>
-          <button id="runRecipeButton" type="button">선택 Recipe 실행</button>
-        </div>
+        <p class="eyebrow">03 · RECIPE</p><h2>반복 업무 저장</h2>
+        <div class="recipe-row"><input id="recipeName" placeholder="예: 월간 거래처 정리" maxlength="40" /><button id="saveRecipeButton" class="primary" type="button">현재 작업순서 저장</button><select id="recipeSelect" aria-label="저장된 Recipe"></select><button id="runRecipeButton" type="button">선택 Recipe 실행</button></div>
       </section>
 
-      <section class="card">
-        <p class="eyebrow">HISTORY</p>
-        <h2>현재 변환 순서</h2>
-        <div id="operationList" class="operation-list"></div>
+      <section class="card rule-card">
+        <p class="eyebrow">04 · RULES</p><h2>업무 검증 규칙</h2>
+        <div class="recipe-row">
+          <select id="ruleColumn" aria-label="규칙 컬럼"></select>
+          <select id="ruleKind" aria-label="규칙 유형"><option value="required">필수값</option><option value="email">이메일 형식</option><option value="number">숫자</option><option value="enum">허용값 목록</option></select>
+          <input id="ruleParameter" placeholder="허용값 규칙일 때: ACTIVE,INACTIVE" maxlength="500" />
+          <button id="addRuleButton" class="primary" type="button">규칙 추가</button>
+        </div>
+        <p class="rule-summary">현재 위반 <strong id="ruleIssueCount">0</strong>건</p>
+        <div id="ruleList" class="rule-list"></div>
       </section>
+
+      <section class="card"><p class="eyebrow">HISTORY</p><h2>현재 변환 순서</h2><div id="operationList" class="operation-list"></div></section>
     </aside>
 
     <main class="main">
@@ -77,52 +62,22 @@
 
       <section class="workspace">
         <div class="workspace-toolbar">
-          <div>
-            <p class="eyebrow">DATA PREVIEW</p>
-            <h2>가져온 데이터를 바로 확인하고 정리합니다.</h2>
-            <p>검색은 모든 컬럼을 대상으로 하며 최대 50행씩 표시합니다.</p>
-          </div>
-          <div class="toolbar-actions">
-            <input id="searchInput" type="search" placeholder="전체 컬럼 검색" />
-            <button id="exportCsvButton" type="button">CSV Export</button>
-            <button id="exportXlsxButton" class="primary" type="button">Excel Export</button>
-          </div>
+          <div><p class="eyebrow">DATA PREVIEW</p><h2>가져온 데이터를 바로 확인하고 정리합니다.</h2><p>검색은 모든 컬럼을 대상으로 하며 최대 50행씩 표시합니다.</p></div>
+          <div class="toolbar-actions"><input id="searchInput" type="search" placeholder="전체 컬럼 검색" /><button id="exportCsvButton" type="button">CSV Export</button><button id="exportXlsxButton" class="primary" type="button">Excel Export</button></div>
         </div>
+        <div class="table-wrap"><table><thead id="tableHead"></thead><tbody id="tableBody"></tbody></table></div>
+        <div class="workspace-footer"><p class="muted">원본은 메모리에 유지되므로 언제든 초기 상태로 되돌릴 수 있습니다.</p><div class="pager"><button id="prevPage" type="button">이전</button><span id="pageLabel"></span><button id="nextPage" type="button">다음</button></div></div>
+      </section>
 
-        <div class="table-wrap">
-          <table>
-            <thead id="tableHead"></thead>
-            <tbody id="tableBody"></tbody>
-          </table>
-        </div>
-
-        <div class="workspace-footer">
-          <p class="muted">원본은 메모리에 유지되므로 언제든 초기 상태로 되돌릴 수 있습니다.</p>
-          <div class="pager">
-            <button id="prevPage" type="button">이전</button>
-            <span id="pageLabel"></span>
-            <button id="nextPage" type="button">다음</button>
-          </div>
-        </div>
+      <section class="quality-panel rule-review-panel">
+        <div class="quality-header"><div><p class="eyebrow">CUSTOM RULE REVIEW</p><h2>사용자가 정의한 업무 규칙 위반을 확인합니다.</h2><p class="quality-copy">규칙은 현재 브라우저에 저장되며 다른 파일을 불러오면 존재하는 컬럼에 맞는 규칙만 유지됩니다.</p></div></div>
+        <div id="ruleIssueList" class="quality-list"></div>
       </section>
 
       <section class="quality-panel">
         <div class="quality-header">
-          <div>
-            <p class="eyebrow">QUALITY REVIEW</p>
-            <h2>빈 값 · 이메일 · 전화번호 · 중복을 자동 점검합니다.</h2>
-            <p class="quality-copy">현재 필터의 문제 목록을 검수 리포트 CSV로 내려받아 담당자나 고객에게 전달할 수 있습니다.</p>
-          </div>
-          <div class="quality-controls">
-            <select id="issueFilter" aria-label="문제 유형 필터">
-              <option value="all">전체 문제</option>
-              <option value="blank">빈 값</option>
-              <option value="email">이메일</option>
-              <option value="phone">전화번호</option>
-              <option value="duplicate">중복</option>
-            </select>
-            <button id="issueReportButton" class="primary" type="button">검수 리포트 CSV</button>
-          </div>
+          <div><p class="eyebrow">QUALITY REVIEW</p><h2>빈 값 · 이메일 · 전화번호 · 중복을 자동 점검합니다.</h2><p class="quality-copy">현재 필터의 문제 목록을 검수 리포트 CSV로 내려받아 담당자나 고객에게 전달할 수 있습니다.</p></div>
+          <div class="quality-controls"><select id="issueFilter" aria-label="문제 유형 필터"><option value="all">전체 문제</option><option value="blank">빈 값</option><option value="email">이메일</option><option value="phone">전화번호</option><option value="duplicate">중복</option></select><button id="issueReportButton" class="primary" type="button">검수 리포트 CSV</button></div>
         </div>
         <div id="qualityList" class="quality-list"></div>
       </section>
