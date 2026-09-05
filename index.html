@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="API 키와 서버 없이 Excel/CSV 데이터를 검증, 정리, 중복 제거, 변환하고 다시 내보내는 브라우저 업무 자동화 도구" />
+  <meta name="description" content="API 키와 서버 없이 Excel/CSV 데이터를 검증, 정리, 중복 제거, 변환하고 품질 검수 리포트까지 내보내는 브라우저 업무 자동화 도구" />
   <meta name="theme-color" content="#142033" />
   <title>Customer Data Workbench</title>
 </head>
@@ -111,14 +111,18 @@
           <div>
             <p class="eyebrow">QUALITY REVIEW</p>
             <h2>빈 값 · 이메일 · 전화번호 · 중복을 자동 점검합니다.</h2>
+            <p class="quality-copy">현재 필터의 문제 목록을 검수 리포트 CSV로 내려받아 담당자나 고객에게 전달할 수 있습니다.</p>
           </div>
-          <select id="issueFilter" aria-label="문제 유형 필터">
-            <option value="all">전체 문제</option>
-            <option value="blank">빈 값</option>
-            <option value="email">이메일</option>
-            <option value="phone">전화번호</option>
-            <option value="duplicate">중복</option>
-          </select>
+          <div class="quality-controls">
+            <select id="issueFilter" aria-label="문제 유형 필터">
+              <option value="all">전체 문제</option>
+              <option value="blank">빈 값</option>
+              <option value="email">이메일</option>
+              <option value="phone">전화번호</option>
+              <option value="duplicate">중복</option>
+            </select>
+            <button id="issueReportButton" class="primary" type="button">검수 리포트 CSV</button>
+          </div>
         </div>
         <div id="qualityList" class="quality-list"></div>
       </section>
