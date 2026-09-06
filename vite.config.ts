@@ -4,7 +4,7 @@ export default defineConfig({
   base: '/customer-map-planner/',
   build: {
     rollupOptions: {
-      input: ['index.html', 'mapping.html']
+      input: ['index.html', 'mapping.html', 'compare.html']
     }
   }
 });
