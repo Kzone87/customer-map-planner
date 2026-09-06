@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="여러 Excel/CSV 파일에 동일 Workflow Preset을 적용하고 목표 스키마로 이관하는 local-first batch migration workspace" />
+  <title>Batch Migration · Customer Data Workbench V3</title>
+</head>
+<body>
+  <header class="batch-header">
+    <div><p>Customer Data Workbench · V3</p><h1>Batch & Migration Workspace</h1><span>Mapping + Clean + Validation + Target Schema를 여러 파일에 한 번에 적용합니다.</span></div>
+    <nav><a href="./">Data Workbench</a><a href="./mapping.html">Column Mapping</a><a href="./compare.html">Data Compare</a></nav>
+  </header>
+
+  <main class="batch-shell">
+    <section class="batch-card preset-card">
+      <p class="eyebrow">01 · WORKFLOW PRESET</p>
+      <h2>재사용할 변환 규칙</h2>
+      <p>Preset JSON은 mapping, 정리 operation, validation rule, 최종 target columns를 하나로 묶습니다.</p>
+      <textarea id="presetJson" spellcheck="false" aria-label="Workflow preset JSON"></textarea>
+      <div class="button-row">
+        <button id="samplePreset" type="button">샘플 Preset</button>
+        <label class="file-button">Preset Import<input id="presetFile" type="file" accept="application/json,.json" /></label>
+        <button id="presetExport" type="button">Preset Export</button>
+      </div>
+      <p id="presetStatus" class="status" role="status"></p>
+    </section>
+
+    <section class="batch-card input-card">
+      <p class="eyebrow">02 · BATCH INPUT</p>
+      <h2>여러 업무 파일 선택</h2>
+      <input id="batchFiles" type="file" accept=".xlsx,.xls,.csv" multiple />
+      <p class="muted">파일은 서버로 전송하지 않고 브라우저 메모리에서 순차 처리합니다.</p>
+      <button id="runBatch" class="primary" type="button">Batch Migration 실행</button>
+      <div class="progress-track"><div id="progressBar"></div></div>
+      <p id="batchStatus" class="status" role="status"></p>
+    </section>
+
+    <section class="batch-card summary-card">
+      <p class="eyebrow">03 · RESULT</p>
+      <h2>파일별 처리 결과</h2>
+      <div class="metrics">
+        <article><span>Total</span><strong id="metricTotal">0</strong></article>
+        <article><span>Success</span><strong id="metricSuccess">0</strong></article>
+        <article><span>Validation</span><strong id="metricValidation">0</strong></article>
+        <article><span>Error</span><strong id="metricError">0</strong></article>
+      </div>
+      <div class="button-row">
+        <button id="reportCsv" type="button" disabled>Migration Report CSV</button>
+        <button id="combinedXlsx" class="primary" type="button" disabled>정상 결과 통합 XLSX</button>
+      </div>
+    </section>
+
+    <section class="batch-card table-card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>File</th><th>Status</th><th>Rows</th><th>Validation</th><th>Error</th></tr></thead>
+          <tbody id="resultBody"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="/src/batch-main.ts"></script>
+</body>
+</html>
