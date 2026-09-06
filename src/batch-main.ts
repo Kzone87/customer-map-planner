@@ -1,9 +1,13 @@
 import './batch.css';
-import { DataRow, exportCsv, exportXlsx, parseFile } from './data';
-import { buildMigrationReport, runBatch, sanitizeWorkflowPreset, BatchResult, WorkflowPreset } from './workflow';
+import { DataRow, exportCsv, exportXlsx, parseFile, SAMPLE_ROWS } from './data';
+import { buildMigrationReport, runBatch, BatchResult, WorkflowPreset } from './workflow';
 
-const presetJson = document.querySelector<HTMLTextAreaElement>('#presetJson')!;
-const presetFile = document.querySelector<HTMLInputElement>('#presetFile')!;
+const presetName = document.querySelector<HTMLInputElement>('#presetName')!;
+const mappingSource = document.querySelector<HTMLInputElement>('#mappingSource')!;
+const mappingTarget = document.querySelector<HTMLInputElement>('#mappingTarget')!;
+const requiredColumn = document.querySelector<HTMLInputElement>('#requiredColumn')!;
+const emailColumn = document.querySelector<HTMLInputElement>('#emailColumn')!;
+const targetColumns = document.querySelector<HTMLInputElement>('#targetColumns')!;
 const batchFiles = document.querySelector<HTMLInputElement>('#batchFiles')!;
 const presetStatus = document.querySelector<HTMLElement>('#presetStatus')!;
 const batchStatus = document.querySelector<HTMLElement>('#batchStatus')!;
@@ -12,37 +16,65 @@ const progressBar = document.querySelector<HTMLElement>('#progressBar')!;
 const reportCsv = document.querySelector<HTMLButtonElement>('#reportCsv')!;
 const combinedXlsx = document.querySelector<HTMLButtonElement>('#combinedXlsx')!;
 
-const samplePreset: WorkflowPreset = {
-  version: 1,
-  name: 'ERP customer migration',
-  mappings: [
-    { source: '거래처명', target: 'company' },
-    { source: '이메일', target: 'email' },
-    { source: '연락처', target: 'phone' }
-  ],
-  operations: ['trim', 'email', 'phone', 'dedupe'],
-  rules: [
-    { id: 'company-required', column: 'company', kind: 'required' },
-    { id: 'email-format', column: 'email', kind: 'email' }
-  ],
-  targetColumns: ['company', 'email', 'phone', '지역', '상태']
+const STATUS_LABELS: Record<BatchResult['status'], string> = {
+  SUCCESS: '정상 완료',
+  VALIDATION_FAILED: '확인 필요',
+  ERROR: '처리 실패'
 };
 
 let lastResults: BatchResult[] = [];
 
-function setSamplePreset() {
-  presetJson.value = JSON.stringify(samplePreset, null, 2);
-  presetStatus.textContent = '샘플 Preset을 불러왔습니다. 입력 파일 컬럼에 맞게 수정할 수 있습니다.';
+function checked(id: string): boolean {
+  return document.querySelector<HTMLInputElement>(`#${id}`)!.checked;
 }
 
-function parsePreset(): WorkflowPreset {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(presetJson.value);
-  } catch {
-    throw new Error('Preset JSON 문법을 확인해 주세요.');
+function buildPresetFromForm(): WorkflowPreset {
+  const name = presetName.value.trim();
+  if (!name) throw new Error('작업 이름을 입력해 주세요.');
+
+  const source = mappingSource.value.trim();
+  const target = mappingTarget.value.trim();
+  if ((source && !target) || (!source && target)) {
+    throw new Error('항목 이름을 바꾸려면 원본 이름과 새 이름을 모두 입력해 주세요.');
   }
-  return sanitizeWorkflowPreset(parsed);
+
+  const operations: WorkflowPreset['operations'] = [];
+  if (checked('opTrim')) operations.push('trim');
+  if (checked('opEmail')) operations.push('email');
+  if (checked('opPhone')) operations.push('phone');
+  if (checked('opDedupe')) operations.push('dedupe');
+
+  const rules: WorkflowPreset['rules'] = [];
+  const required = requiredColumn.value.trim();
+  const email = emailColumn.value.trim();
+  if (required) rules.push({ id: 'required-field', column: required, kind: 'required' });
+  if (email) rules.push({ id: 'email-field', column: email, kind: 'email' });
+
+  const outputColumns = targetColumns.value
+    .split(',')
+    .map((value) => value.trim())
+    .filter((value, index, values) => value && values.indexOf(value) === index);
+
+  return {
+    version: 1,
+    name,
+    mappings: source && target ? [{ source, target }] : [],
+    operations,
+    rules,
+    targetColumns: outputColumns
+  };
+}
+
+function friendlyError(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error);
+  return raw
+    .replaceAll('Preset', '작업 규칙')
+    .replaceAll('preset', '작업 규칙')
+    .replaceAll('JSON', '설정값')
+    .replaceAll('컬럼', '항목')
+    .replaceAll('스키마', '결과 형식')
+    .replace(/\s*\n\s*/g, ' · ')
+    .trim() || '파일을 처리하지 못했습니다. 입력 파일과 작업 기준을 확인해 주세요.';
 }
 
 function download(blob: Blob, filename: string) {
@@ -67,7 +99,13 @@ function renderResults(results: BatchResult[]) {
   resultBody.replaceChildren();
   results.forEach((result) => {
     const row = document.createElement('tr');
-    const cells = [result.name, result.status, String(result.rows.length), String(result.issues.length), result.error ?? ''];
+    const cells = [
+      result.name,
+      STATUS_LABELS[result.status],
+      String(result.rows.length),
+      String(result.issues.length),
+      result.error ? friendlyError(result.error) : result.issues.length ? '입력값을 확인해 주세요.' : '완료'
+    ];
     cells.forEach((value, index) => {
       const cell = document.createElement('td');
       cell.textContent = value;
@@ -86,91 +124,83 @@ async function readFiles(files: File[]) {
   const parseErrors: BatchResult[] = [];
   for (const [index, file] of files.entries()) {
     progressBar.style.width = `${Math.round((index / Math.max(files.length, 1)) * 55)}%`;
-    batchStatus.textContent = `${index + 1}/${files.length} 파일 읽는 중: ${file.name}`;
+    batchStatus.textContent = `${index + 1}/${files.length} 파일 읽는 중 · ${file.name}`;
     try {
       items.push({ name: file.name, rows: await parseFile(file) });
     } catch (error) {
-      parseErrors.push({
-        name: file.name,
-        status: 'ERROR',
-        rows: [],
-        issues: [],
-        error: error instanceof Error ? error.message : String(error)
-      });
+      parseErrors.push({ name: file.name, status: 'ERROR', rows: [], issues: [], error: friendlyError(error) });
     }
     await new Promise((resolve) => window.setTimeout(resolve, 0));
   }
   return { items, parseErrors };
 }
 
-async function executeBatch() {
-  const files = [...(batchFiles.files ?? [])];
-  if (!files.length) {
-    batchStatus.textContent = '처리할 XLSX/XLS/CSV 파일을 1개 이상 선택해 주세요.';
-    return;
-  }
-  let preset: WorkflowPreset;
-  try {
-    preset = parsePreset();
-    presetStatus.textContent = `Preset 확인 완료: ${preset.name}`;
-  } catch (error) {
-    presetStatus.textContent = error instanceof Error ? error.message : String(error);
-    return;
-  }
-
-  progressBar.style.width = '2%';
-  batchStatus.textContent = 'Batch Migration을 준비하고 있습니다.';
-  const { items, parseErrors } = await readFiles(files);
-  progressBar.style.width = '65%';
-  await new Promise((resolve) => window.setTimeout(resolve, 0));
-  const workflowResults = runBatch(items, preset);
-  lastResults = [...workflowResults, ...parseErrors];
+function finish(results: BatchResult[]) {
+  lastResults = results;
   progressBar.style.width = '100%';
   renderResults(lastResults);
   const success = lastResults.filter((item) => item.status === 'SUCCESS').length;
   const validation = lastResults.filter((item) => item.status === 'VALIDATION_FAILED').length;
   const errors = lastResults.filter((item) => item.status === 'ERROR').length;
-  batchStatus.textContent = `완료 · 정상 ${success} · 검증필요 ${validation} · 오류 ${errors}`;
+  batchStatus.textContent = `완료 · 정상 ${success}개 · 확인 필요 ${validation}개 · 처리 실패 ${errors}개`;
 }
 
-document.querySelector<HTMLButtonElement>('#samplePreset')!.addEventListener('click', setSamplePreset);
+async function executeBatch() {
+  const files = [...(batchFiles.files ?? [])];
+  if (!files.length) {
+    batchStatus.textContent = '정리할 Excel 또는 CSV 파일을 1개 이상 선택해 주세요.';
+    return;
+  }
+  let preset: WorkflowPreset;
+  try {
+    preset = buildPresetFromForm();
+    presetStatus.textContent = `적용할 작업: ${preset.name}`;
+  } catch (error) {
+    presetStatus.textContent = friendlyError(error);
+    return;
+  }
+
+  progressBar.style.width = '2%';
+  batchStatus.textContent = '파일 정리를 준비하고 있습니다.';
+  const { items, parseErrors } = await readFiles(files);
+  progressBar.style.width = '65%';
+  await new Promise((resolve) => window.setTimeout(resolve, 0));
+  finish([...runBatch(items, preset), ...parseErrors]);
+}
+
+function runSampleBatch() {
+  presetName.value = '거래처 파일 정리';
+  mappingSource.value = '';
+  mappingTarget.value = '';
+  requiredColumn.value = '거래처명';
+  emailColumn.value = '이메일';
+  targetColumns.value = '';
+  const preset = buildPresetFromForm();
+  const samples = [
+    { name: '서울_거래처_8월.xlsx', rows: SAMPLE_ROWS.map((row) => ({ ...row })) },
+    { name: '경기_거래처_8월.xlsx', rows: SAMPLE_ROWS.slice(1).map((row) => ({ ...row })) },
+    { name: '신규_거래처_8월.csv', rows: SAMPLE_ROWS.slice(0, 4).map((row) => ({ ...row })) }
+  ];
+  presetStatus.textContent = '샘플용 거래처 정리 기준을 적용했습니다.';
+  progressBar.style.width = '65%';
+  finish(runBatch(samples, preset));
+}
+
 document.querySelector<HTMLButtonElement>('#runBatch')!.addEventListener('click', () => void executeBatch());
-
-document.querySelector<HTMLButtonElement>('#presetExport')!.addEventListener('click', () => {
-  try {
-    const preset = parsePreset();
-    download(new Blob([JSON.stringify(preset, null, 2)], { type: 'application/json;charset=utf-8' }), 'customer-data-workflow-preset.json');
-    presetStatus.textContent = '검증된 Preset JSON을 내보냈습니다.';
-  } catch (error) {
-    presetStatus.textContent = error instanceof Error ? error.message : String(error);
-  }
-});
-
-presetFile.addEventListener('change', async () => {
-  const file = presetFile.files?.[0];
-  if (!file) return;
-  try {
-    const text = await file.text();
-    const preset = sanitizeWorkflowPreset(JSON.parse(text));
-    presetJson.value = JSON.stringify(preset, null, 2);
-    presetStatus.textContent = `Preset Import 완료: ${preset.name}`;
-  } catch (error) {
-    presetStatus.textContent = error instanceof Error ? error.message : 'Preset을 읽지 못했습니다.';
-  }
-});
+document.querySelector<HTMLButtonElement>('#sampleBatch')!.addEventListener('click', runSampleBatch);
 
 reportCsv.addEventListener('click', () => {
   const report = buildMigrationReport(lastResults) as unknown as DataRow[];
-  download(exportCsv(report), 'migration-report.csv');
+  download(exportCsv(report), '파일-처리-결과.csv');
 });
 
 combinedXlsx.addEventListener('click', () => {
   const combined: DataRow[] = lastResults
     .filter((result) => result.status === 'SUCCESS')
-    .flatMap((result) => result.rows.map((row) => ({ __source_file: result.name, ...row })));
+    .flatMap((result) => result.rows.map((row) => ({ 출처파일: result.name, ...row })));
   if (!combined.length) return;
-  download(exportXlsx(combined), 'migration-success-results.xlsx');
+  download(exportXlsx(combined), '정상-처리-통합.xlsx');
 });
 
-setSamplePreset();
+presetStatus.textContent = '필요한 정리 작업을 체크한 뒤 파일을 선택하세요.';
 renderResults([]);

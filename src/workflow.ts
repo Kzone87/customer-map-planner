@@ -57,10 +57,10 @@ function cleanTargetColumns(value: unknown): string[] {
 }
 
 export function sanitizeWorkflowPreset(value: unknown): WorkflowPreset {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Preset must be a JSON object.');
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('작업 규칙 형식을 확인해 주세요.');
   const record = value as Record<string, unknown>;
   const name = cleanName(record.name);
-  if (!name) throw new Error('Preset name is required.');
+  if (!name) throw new Error('작업 이름을 입력해 주세요.');
 
   const mappings: ColumnMapping[] = Array.isArray(record.mappings)
     ? record.mappings.flatMap((item): ColumnMapping[] => {
@@ -101,15 +101,15 @@ export function sanitizeWorkflowPreset(value: unknown): WorkflowPreset {
 }
 
 export function validatePresetForColumns(columns: string[], preset: WorkflowPreset): string[] {
-  const errors = validateMappings(columns, preset.mappings);
+  const errors = validateMappings(columns, preset.mappings).map((error) => error.replaceAll('컬럼', '항목').replaceAll('매핑', '이름 변경'));
   const mappedColumns = columns.map((column) => preset.mappings.find((mapping) => mapping.source === column)?.target ?? column);
   const mappedSet = new Set(mappedColumns);
   for (const rule of preset.rules) {
-    if (!mappedSet.has(rule.column)) errors.push(`규칙 대상 컬럼이 없습니다: ${rule.column}`);
+    if (!mappedSet.has(rule.column)) errors.push(`입력 파일에 “${rule.column}” 항목이 없습니다.`);
   }
   if (preset.targetColumns.length) {
     for (const target of preset.targetColumns) {
-      if (!mappedSet.has(target)) errors.push(`목표 스키마 컬럼을 만들 수 없습니다: ${target}`);
+      if (!mappedSet.has(target)) errors.push(`결과에 남길 “${target}” 항목을 찾을 수 없습니다.`);
     }
   }
   return [...new Set(errors)];
@@ -121,7 +121,7 @@ function projectTargetSchema(rows: DataRow[], targetColumns: string[]): DataRow[
 }
 
 export function applyWorkflowPreset(rows: DataRow[], preset: WorkflowPreset): WorkflowResult {
-  if (!rows.length) throw new Error('데이터가 없습니다.');
+  if (!rows.length) throw new Error('파일에 처리할 데이터가 없습니다.');
   const inputColumns = getColumns(rows);
   const errors = validatePresetForColumns(inputColumns, preset);
   if (errors.length) throw new Error(errors.join('\n'));
@@ -162,11 +162,16 @@ export function runBatch(items: BatchItem[], preset: WorkflowPreset): BatchResul
 }
 
 export function buildMigrationReport(results: BatchResult[]) {
+  const statusLabel: Record<BatchResult['status'], string> = {
+    SUCCESS: '정상 완료',
+    VALIDATION_FAILED: '확인 필요',
+    ERROR: '처리 실패'
+  };
   return results.map((result) => ({
-    file: result.name,
-    status: result.status,
-    rows: result.rows.length,
-    validationIssues: result.issues.length,
-    error: result.error ?? ''
+    파일: result.name,
+    상태: statusLabel[result.status],
+    행수: result.rows.length,
+    확인할내용: result.issues.length,
+    안내: result.error ?? ''
   }));
 }

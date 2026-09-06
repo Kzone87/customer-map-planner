@@ -16,9 +16,7 @@ function displayCell(value: unknown): string {
 
 function currentIssueValue(row: DataRow | undefined, issue: QualityIssue) {
   if (!row) return null;
-  if (issue.column === '-') {
-    return Object.values(row).map(displayCell).join(' | ');
-  }
+  if (issue.column === '-') return Object.values(row).map(displayCell).join(' | ');
   return row[issue.column] ?? null;
 }
 
@@ -31,9 +29,9 @@ export function buildIssueReportRows(
     .filter((issue) => filter === 'all' || issue.type === filter)
     .map((issue) => ({
       행번호: issue.rowIndex + 1,
-      컬럼: issue.column === '-' ? '전체 행' : issue.column,
+      항목: issue.column === '-' ? '전체 행' : issue.column,
       유형: ISSUE_LABELS[issue.type],
-      메시지: issue.message,
+      안내: issue.message,
       현재값: currentIssueValue(rows[issue.rowIndex], issue)
     }));
 }
