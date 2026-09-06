@@ -27,7 +27,7 @@
   <section class="command-bar" aria-label="파일과 정리 도구">
     <div class="file-command">
       <label class="file-picker"><span>파일 열기</span><input id="fileInput" type="file" accept=".xlsx,.xls,.csv"/></label>
-      <button id="sampleButton" type="button">샘플 열기</button>
+      <button id="sampleButton" type="button">예제 파일</button>
       <div class="source-block"><strong id="sourceName" class="source-name"></strong><span id="sourceMeta" class="source-meta"></span></div>
     </div>
     <div class="quick-command" aria-label="빠른 정리">
@@ -54,58 +54,22 @@
   <div class="sheet-layout">
     <section class="sheet-pane" aria-label="데이터 표">
       <div class="sheet-toolbar">
-        <div>
-          <h2>파일 내용</h2>
-          <p>셀을 훑어보고 필요한 정리만 적용하세요. 빈 값은 따로 표시됩니다.</p>
-        </div>
-        <div class="sheet-actions">
-          <input id="searchInput" type="search" placeholder="전체 데이터 검색" aria-label="전체 데이터 검색"/>
-          <button id="exportCsvButton" type="button">CSV 저장</button>
-          <button id="exportXlsxButton" class="primary" type="button">Excel 저장</button>
-        </div>
+        <div><h2>파일 내용</h2><p>셀을 훑어보고 필요한 정리만 적용하세요. 빈 값은 따로 표시됩니다.</p></div>
+        <div class="sheet-actions"><input id="searchInput" type="search" placeholder="전체 데이터 검색" aria-label="전체 데이터 검색"/><button id="exportCsvButton" type="button">CSV 저장</button><button id="exportXlsxButton" class="primary" type="button">Excel 저장</button></div>
       </div>
       <div class="table-wrap data-grid-wrap"><table><thead id="tableHead"></thead><tbody id="tableBody"></tbody></table></div>
-      <div class="sheet-footer">
-        <span>원본은 유지됩니다.</span>
-        <div class="pager"><button id="prevPage" type="button">이전</button><span id="pageLabel"></span><button id="nextPage" type="button">다음</button></div>
-      </div>
+      <div class="sheet-footer"><span>원본은 유지됩니다.</span><div class="pager"><button id="prevPage" type="button">이전</button><span id="pageLabel"></span><button id="nextPage" type="button">다음</button></div></div>
     </section>
 
     <aside class="inspector" aria-label="검사와 작업 설정">
-      <details open>
-        <summary><span>자동 확인</span><strong id="autoIssueSummary">문제 확인</strong></summary>
-        <div class="inspector-body">
-          <p>빈 값·이메일·전화번호·중복 문제를 자동으로 모아 보여줍니다.</p>
-          <div class="inspector-controls"><select id="issueFilter" aria-label="문제 유형"><option value="all">전체 문제</option><option value="blank">빈 값</option><option value="email">이메일</option><option value="phone">전화번호</option><option value="duplicate">중복</option></select><button id="issueReportButton" type="button">문제 목록 CSV</button></div>
-          <div id="qualityList" class="quality-list"></div>
-        </div>
-      </details>
-
-      <details>
-        <summary><span>내 검사 기준</span><strong><span id="ruleIssueCount">0</span>건</strong></summary>
-        <div class="inspector-body">
-          <p>업무에 맞는 필수값·형식 기준을 추가합니다.</p>
-          <div class="rule-builder"><select id="ruleColumn" aria-label="검사할 항목"></select><select id="ruleKind" aria-label="검사 방법"><option value="required">필수값</option><option value="email">이메일 형식</option><option value="number">숫자만</option><option value="enum">지정한 값만 허용</option></select><input id="ruleParameter" placeholder="예: 사용중,중지" maxlength="500"/><button id="addRuleButton" class="primary" type="button">검사 추가</button></div>
-          <div id="ruleList" class="rule-list"></div>
-          <div id="ruleIssueList" class="quality-list rule-issue-list"></div>
-        </div>
-      </details>
-
-      <details>
-        <summary><span>작업순서 저장</span><strong>반복 작업</strong></summary>
-        <div class="inspector-body">
-          <p>지금까지 적용한 정리 순서를 저장해 다음 파일에 다시 실행합니다.</p>
-          <div class="recipe-row"><input id="recipeName" placeholder="예: 월간 거래처 정리" maxlength="40"/><button id="saveRecipeButton" class="primary" type="button">현재 순서 저장</button><select id="recipeSelect" aria-label="저장된 작업순서"></select><button id="runRecipeButton" type="button">선택 순서 실행</button></div>
-        </div>
-      </details>
-
-      <details>
-        <summary><span>작업 기록</span><strong>현재 파일</strong></summary>
-        <div class="inspector-body"><div id="operationList" class="operation-list"></div></div>
-      </details>
+      <details open><summary><span>자동 확인</span><strong id="autoIssueSummary">문제 확인</strong></summary><div class="inspector-body"><p>빈 값·이메일·전화번호·중복 문제를 자동으로 모아 보여줍니다.</p><div class="inspector-controls"><select id="issueFilter" aria-label="문제 유형"><option value="all">전체 문제</option><option value="blank">빈 값</option><option value="email">이메일</option><option value="phone">전화번호</option><option value="duplicate">중복</option></select><button id="issueReportButton" type="button">문제 목록 CSV</button></div><div id="qualityList" class="quality-list"></div></div></details>
+      <details><summary><span>내 검사 기준</span><strong><span id="ruleIssueCount">0</span>건</strong></summary><div class="inspector-body"><p>업무에 맞는 필수값·형식 기준을 추가합니다.</p><div class="rule-builder"><select id="ruleColumn" aria-label="검사할 항목"></select><select id="ruleKind" aria-label="검사 방법"><option value="required">필수값</option><option value="email">이메일 형식</option><option value="number">숫자만</option><option value="enum">지정한 값만 허용</option></select><input id="ruleParameter" placeholder="예: 사용중,중지" maxlength="500"/><button id="addRuleButton" class="primary" type="button">검사 추가</button></div><div id="ruleList" class="rule-list"></div><div id="ruleIssueList" class="quality-list rule-issue-list"></div></div></details>
+      <details><summary><span>작업순서 저장</span><strong>반복 작업</strong></summary><div class="inspector-body"><p>지금까지 적용한 정리 순서를 저장해 다음 파일에 다시 실행합니다.</p><div class="recipe-row"><input id="recipeName" placeholder="예: 월간 거래처 정리" maxlength="40"/><button id="saveRecipeButton" class="primary" type="button">현재 순서 저장</button><select id="recipeSelect" aria-label="저장된 작업순서"></select><button id="runRecipeButton" type="button">선택 순서 실행</button></div></div></details>
+      <details><summary><span>작업 기록</span><strong>현재 파일</strong></summary><div class="inspector-body"><div id="operationList" class="operation-list"></div></div></details>
     </aside>
   </div>
 </main>
 <script type="module" src="/src/main.ts"></script>
+<script type="module" src="/src/product-polish.ts"></script>
 </body>
 </html>
