@@ -18,16 +18,8 @@ import {
 import { buildIssueReportRows, exportIssueReportCsv, IssueFilter } from './report';
 import { RuleKind, ruleLabel, sanitizeRules, validateRules, ValidationRule } from './rules';
 
-type Snapshot = {
-  rows: DataRow[];
-  operations: Operation[];
-  label: string;
-};
-
-type SavedRecipe = {
-  name: string;
-  operations: OperationKind[];
-};
+type Snapshot = { rows: DataRow[]; operations: Operation[]; label: string };
+type SavedRecipe = { name: string; operations: OperationKind[] };
 
 const RECIPE_KEY = 'customer-data-workbench-recipes-v1';
 const RULE_KEY = 'customer-data-workbench-rules-v1';
@@ -81,28 +73,11 @@ const elements = {
   ruleIssueList: byId<HTMLElement>('ruleIssueList')
 };
 
-function cloneRows(rows: DataRow[]): DataRow[] {
-  return rows.map((row) => ({ ...row }));
-}
-
-function cloneOperations(operations: Operation[]): Operation[] {
-  return operations.map((operation) => ({ ...operation }));
-}
-
-function currentSnapshot(label: string): Snapshot {
-  return { rows: cloneRows(state.rows), operations: cloneOperations(state.operations), label };
-}
-
-function restoreSnapshot(snapshot: Snapshot) {
-  state.rows = cloneRows(snapshot.rows);
-  state.operations = cloneOperations(snapshot.operations);
-  state.page = 0;
-}
-
-function setStatus(message: string, kind: 'info' | 'success' | 'error' = 'info') {
-  elements.status.textContent = message;
-  elements.status.dataset.kind = kind;
-}
+function cloneRows(rows: DataRow[]): DataRow[] { return rows.map((row) => ({ ...row })); }
+function cloneOperations(operations: Operation[]): Operation[] { return operations.map((operation) => ({ ...operation })); }
+function currentSnapshot(label: string): Snapshot { return { rows: cloneRows(state.rows), operations: cloneOperations(state.operations), label }; }
+function restoreSnapshot(snapshot: Snapshot) { state.rows = cloneRows(snapshot.rows); state.operations = cloneOperations(snapshot.operations); state.page = 0; }
+function setStatus(message: string, kind: 'info' | 'success' | 'error' = 'info') { elements.status.textContent = message; elements.status.dataset.kind = kind; }
 
 function pushHistory(label: string) {
   state.history.push(currentSnapshot(label));
@@ -146,7 +121,7 @@ function resetDataset() {
   state.query = '';
   elements.search.value = '';
   render();
-  setStatus('원본 데이터 상태로 되돌렸습니다.');
+  setStatus('처음 불러온 상태로 되돌렸습니다.');
 }
 
 function loadRows(rows: DataRow[], sourceName: string) {
@@ -161,12 +136,10 @@ function loadRows(rows: DataRow[], sourceName: string) {
   elements.search.value = '';
   state.rules = readRules(getColumns(rows));
   render();
-  setStatus(`${sourceName}에서 ${rows.length.toLocaleString()}행을 불러왔습니다.`, 'success');
+  setStatus(`${sourceName}에서 ${rows.length.toLocaleString('ko-KR')}행을 불러왔습니다.`, 'success');
 }
 
-function getFilteredRows() {
-  return state.rows.filter((row) => matchesQuery(row, state.query));
-}
+function getFilteredRows() { return state.rows.filter((row) => matchesQuery(row, state.query)); }
 
 function createCell(value: unknown) {
   const cell = document.createElement('td');
@@ -216,30 +189,28 @@ function renderTable(profile: DataProfile) {
     });
   }
   elements.tableBody.replaceChildren(fragment);
-  elements.pageLabel.textContent = `${state.page + 1} / ${pageCount} · 검색 ${filtered.length.toLocaleString()}행`;
+  elements.pageLabel.textContent = `${state.page + 1} / ${pageCount} · 검색 결과 ${filtered.length.toLocaleString('ko-KR')}행`;
   elements.prev.disabled = state.page <= 0;
   elements.next.disabled = state.page >= pageCount - 1;
-  elements.sourceMeta.textContent = `${profile.rows.toLocaleString()} rows · ${profile.columns.length} columns`;
+  elements.sourceMeta.textContent = `${profile.rows.toLocaleString('ko-KR')}행 · ${profile.columns.length}개 항목`;
 }
 
 function renderQuality(profile: DataProfile) {
-  elements.rowCount.textContent = profile.rows.toLocaleString();
+  elements.rowCount.textContent = profile.rows.toLocaleString('ko-KR');
   elements.columnCount.textContent = String(profile.columns.length);
-  elements.issueCount.textContent = (profile.blankCells + profile.invalidEmails + profile.invalidPhones).toLocaleString();
-  elements.duplicateCount.textContent = profile.duplicateRows.toLocaleString();
+  elements.issueCount.textContent = (profile.blankCells + profile.invalidEmails + profile.invalidPhones).toLocaleString('ko-KR');
+  elements.duplicateCount.textContent = profile.duplicateRows.toLocaleString('ko-KR');
 
   const filteredIssues = profile.issues.filter((issue) => state.issueFilter === 'all' || issue.type === state.issueFilter);
   elements.issueReport.disabled = filteredIssues.length === 0;
   const issues = filteredIssues.slice(0, 80);
-
   if (issues.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'empty-state';
-    empty.textContent = '현재 필터에서 발견된 문제가 없습니다.';
+    empty.textContent = '선택한 조건에서 확인할 문제가 없습니다.';
     elements.qualityList.replaceChildren(empty);
     return;
   }
-
   const fragment = document.createDocumentFragment();
   issues.forEach((issue) => {
     const item = document.createElement('div');
@@ -258,7 +229,7 @@ function renderOperations() {
   if (state.operations.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'empty-state';
-    empty.textContent = '아직 적용한 변환이 없습니다.';
+    empty.textContent = '아직 적용한 정리 작업이 없습니다.';
     elements.operationList.replaceChildren(empty);
     return;
   }
@@ -276,14 +247,10 @@ function readRules(columns: string[]): ValidationRule[] {
     const raw = localStorage.getItem(RULE_KEY);
     if (!raw) return [];
     return sanitizeRules(JSON.parse(raw) as unknown, columns);
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 }
 
-function writeRules() {
-  localStorage.setItem(RULE_KEY, JSON.stringify(state.rules));
-}
+function writeRules() { localStorage.setItem(RULE_KEY, JSON.stringify(state.rules)); }
 
 function renderRuleColumns() {
   const columns = getColumns(state.rows);
@@ -300,12 +267,11 @@ function renderRuleColumns() {
 
 function renderRules() {
   const issues = validateRules(state.rows, state.rules);
-  elements.ruleIssueCount.textContent = issues.length.toLocaleString();
-
+  elements.ruleIssueCount.textContent = issues.length.toLocaleString('ko-KR');
   if (state.rules.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'empty-state';
-    empty.textContent = '정의한 검증 규칙이 없습니다.';
+    empty.textContent = '아직 추가한 검사 기준이 없습니다.';
     elements.ruleList.replaceChildren(empty);
   } else {
     const fragment = document.createDocumentFragment();
@@ -321,7 +287,7 @@ function renderRules() {
         state.rules = state.rules.filter((candidate) => candidate.id !== rule.id);
         writeRules();
         render();
-        setStatus('검증 규칙을 삭제했습니다.');
+        setStatus('검사 기준을 삭제했습니다.');
       });
       row.append(label, remove);
       fragment.appendChild(row);
@@ -332,11 +298,10 @@ function renderRules() {
   if (issues.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'empty-state';
-    empty.textContent = state.rules.length ? '현재 데이터는 사용자 규칙을 모두 통과했습니다.' : '규칙을 추가하면 위반 행이 여기에 표시됩니다.';
+    empty.textContent = state.rules.length ? '현재 파일은 추가한 검사 기준을 모두 통과했습니다.' : '검사 기준을 추가하면 확인할 행이 여기에 표시됩니다.';
     elements.ruleIssueList.replaceChildren(empty);
     return;
   }
-
   const fragment = document.createDocumentFragment();
   issues.slice(0, 80).forEach((issue) => {
     const item = document.createElement('div');
@@ -355,36 +320,22 @@ function addRule() {
   const column = elements.ruleColumn.value;
   const kind = elements.ruleKind.value as RuleKind;
   const parameter = elements.ruleParameter.value.trim();
-  if (!column) {
-    setStatus('규칙을 적용할 컬럼이 없습니다.', 'error');
-    return;
-  }
-  if (kind === 'enum' && !parameter.split(',').some((item) => item.trim())) {
-    setStatus('허용값 목록을 쉼표로 입력하세요.', 'error');
-    return;
-  }
+  if (!column) { setStatus('검사할 항목이 없습니다.', 'error'); return; }
+  if (kind === 'enum' && !parameter.split(',').some((item) => item.trim())) { setStatus('허용할 값을 쉼표로 나눠 입력해 주세요.', 'error'); return; }
   const duplicate = state.rules.some((rule) => rule.column === column && rule.kind === kind && (rule.parameter ?? '') === (kind === 'enum' ? parameter : ''));
-  if (duplicate) {
-    setStatus('같은 검증 규칙이 이미 있습니다.', 'error');
-    return;
-  }
-  const rule: ValidationRule = {
-    id: crypto.randomUUID(),
-    column,
-    kind,
-    parameter: kind === 'enum' ? parameter : undefined
-  };
+  if (duplicate) { setStatus('같은 검사 기준이 이미 있습니다.', 'error'); return; }
+  const rule: ValidationRule = { id: crypto.randomUUID(), column, kind, parameter: kind === 'enum' ? parameter : undefined };
   state.rules.push(rule);
   writeRules();
   elements.ruleParameter.value = '';
   render();
-  setStatus(`검증 규칙 “${ruleLabel(rule)}”을 추가했습니다.`, 'success');
+  setStatus(`검사 기준 “${ruleLabel(rule)}”을 추가했습니다.`, 'success');
 }
 
 function syncRuleParameter() {
   const isEnum = elements.ruleKind.value === 'enum';
   elements.ruleParameter.disabled = !isEnum;
-  elements.ruleParameter.placeholder = isEnum ? '예: ACTIVE,INACTIVE,PENDING' : '허용값 규칙에서만 사용';
+  elements.ruleParameter.placeholder = isEnum ? '예: 사용중,중지,보류' : '지정한 값만 허용할 때 사용';
   if (!isEnum) elements.ruleParameter.value = '';
 }
 
@@ -423,21 +374,16 @@ function readRecipes(): SavedRecipe[] {
       if (operations.length !== record.operations.length || operations.length === 0) return [];
       return [{ name: record.name.slice(0, 40), operations }];
     });
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 }
 
-function writeRecipes(recipes: SavedRecipe[]) {
-  localStorage.setItem(RECIPE_KEY, JSON.stringify(recipes));
-  renderRecipeSelect();
-}
+function writeRecipes(recipes: SavedRecipe[]) { localStorage.setItem(RECIPE_KEY, JSON.stringify(recipes)); renderRecipeSelect(); }
 
 function renderRecipeSelect() {
   const recipes = readRecipes();
   const placeholder = document.createElement('option');
   placeholder.value = '';
-  placeholder.textContent = recipes.length ? '저장된 Recipe 선택' : '저장된 Recipe 없음';
+  placeholder.textContent = recipes.length ? '저장된 작업순서 선택' : '저장된 작업순서 없음';
   const options = recipes.map((recipe, index) => {
     const option = document.createElement('option');
     option.value = String(index);
@@ -450,49 +396,31 @@ function renderRecipeSelect() {
 async function handleFile() {
   const file = elements.file.files?.[0];
   if (!file) return;
-  setStatus('파일을 브라우저에서 분석하고 있습니다...');
-  try {
-    const rows = await parseFile(file);
-    loadRows(rows, file.name);
-  } catch (error) {
-    setStatus(error instanceof Error ? error.message : '파일을 읽지 못했습니다.', 'error');
-  } finally {
-    elements.file.value = '';
-  }
+  setStatus('파일을 읽고 있습니다...');
+  try { loadRows(await parseFile(file), file.name); }
+  catch (error) { setStatus(error instanceof Error ? error.message : '파일을 읽지 못했습니다.', 'error'); }
+  finally { elements.file.value = ''; }
 }
 
 function saveRecipe() {
   const name = elements.recipeName.value.trim();
-  if (!name) {
-    setStatus('Recipe 이름을 입력하세요.', 'error');
-    return;
-  }
+  if (!name) { setStatus('저장할 작업순서 이름을 입력해 주세요.', 'error'); return; }
   const operations = state.operations.map((operation) => operation.kind);
-  if (operations.length === 0) {
-    setStatus('저장할 변환 작업이 없습니다.', 'error');
-    return;
-  }
+  if (operations.length === 0) { setStatus('먼저 한 가지 이상 정리 작업을 실행해 주세요.', 'error'); return; }
   const recipes = readRecipes().filter((recipe) => recipe.name !== name);
   recipes.push({ name: name.slice(0, 40), operations });
   writeRecipes(recipes);
   elements.recipeName.value = '';
-  setStatus(`Recipe “${name}”을 브라우저에 저장했습니다.`, 'success');
+  setStatus(`작업순서 “${name}”을 현재 브라우저에 저장했습니다.`, 'success');
 }
 
 function runRecipe() {
   const selected = elements.recipeSelect.value;
-  if (!selected) {
-    setStatus('실행할 Recipe를 선택하세요.', 'error');
-    return;
-  }
+  if (!selected) { setStatus('실행할 작업순서를 선택해 주세요.', 'error'); return; }
   const index = Number(selected);
   const recipe = Number.isInteger(index) ? readRecipes()[index] : undefined;
-  if (!recipe) {
-    setStatus('저장된 Recipe를 읽을 수 없습니다.', 'error');
-    renderRecipeSelect();
-    return;
-  }
-  pushHistory(`Recipe: ${recipe.name}`);
+  if (!recipe) { setStatus('저장된 작업순서를 읽지 못했습니다.', 'error'); renderRecipeSelect(); return; }
+  pushHistory(`작업순서: ${recipe.name}`);
   let rows = cloneRows(state.rows);
   const nextOperations = cloneOperations(state.operations);
   recipe.operations.forEach((kind) => {
@@ -503,18 +431,15 @@ function runRecipe() {
   state.operations = nextOperations;
   state.page = 0;
   render();
-  setStatus(`Recipe “${recipe.name}” ${recipe.operations.length}단계를 적용했습니다.`, 'success');
+  setStatus(`작업순서 “${recipe.name}” ${recipe.operations.length}단계를 적용했습니다.`, 'success');
 }
 
 function exportIssueReport() {
   const profile = profileRows(state.rows);
   const reportRows = buildIssueReportRows(state.rows, profile, state.issueFilter);
-  if (reportRows.length === 0) {
-    setStatus('현재 필터에서 내보낼 품질 문제가 없습니다.', 'error');
-    return;
-  }
-  download(exportIssueReportCsv(state.rows, profile, state.issueFilter), `quality-issues-${state.issueFilter}.csv`);
-  setStatus(`품질 검수 리포트 ${reportRows.length.toLocaleString()}건을 CSV로 내보냈습니다.`, 'success');
+  if (reportRows.length === 0) { setStatus('선택한 조건에서 저장할 문제가 없습니다.', 'error'); return; }
+  download(exportIssueReportCsv(state.rows, profile, state.issueFilter), `확인할-내용-${state.issueFilter}.csv`);
+  setStatus(`확인할 내용 ${reportRows.length.toLocaleString('ko-KR')}건을 CSV로 저장했습니다.`, 'success');
 }
 
 state.rules = readRules(getColumns(state.rows));
@@ -530,29 +455,16 @@ byId<HTMLButtonElement>('resetButton').addEventListener('click', resetDataset);
 byId<HTMLButtonElement>('saveRecipeButton').addEventListener('click', saveRecipe);
 byId<HTMLButtonElement>('runRecipeButton').addEventListener('click', runRecipe);
 byId<HTMLButtonElement>('addRuleButton').addEventListener('click', addRule);
-byId<HTMLButtonElement>('exportCsvButton').addEventListener('click', () => download(exportCsv(state.rows), 'cleaned-data.csv'));
-byId<HTMLButtonElement>('exportXlsxButton').addEventListener('click', () => download(exportXlsx(state.rows), 'cleaned-data.xlsx'));
+byId<HTMLButtonElement>('exportCsvButton').addEventListener('click', () => download(exportCsv(state.rows), '정리된-데이터.csv'));
+byId<HTMLButtonElement>('exportXlsxButton').addEventListener('click', () => download(exportXlsx(state.rows), '정리된-데이터.xlsx'));
 elements.issueReport.addEventListener('click', exportIssueReport);
 elements.ruleKind.addEventListener('change', syncRuleParameter);
-elements.search.addEventListener('input', () => {
-  state.query = elements.search.value;
-  state.page = 0;
-  render();
-});
-elements.issueFilter.addEventListener('change', () => {
-  state.issueFilter = elements.issueFilter.value as IssueFilter;
-  render();
-});
-elements.prev.addEventListener('click', () => {
-  state.page = Math.max(0, state.page - 1);
-  render();
-});
-elements.next.addEventListener('click', () => {
-  state.page += 1;
-  render();
-});
+elements.search.addEventListener('input', () => { state.query = elements.search.value; state.page = 0; render(); });
+elements.issueFilter.addEventListener('change', () => { state.issueFilter = elements.issueFilter.value as IssueFilter; render(); });
+elements.prev.addEventListener('click', () => { state.page = Math.max(0, state.page - 1); render(); });
+elements.next.addEventListener('click', () => { state.page += 1; render(); });
 
 syncRuleParameter();
 renderRecipeSelect();
 render();
-setStatus('API 키나 서버 없이 샘플 데이터를 바로 정리하고 검증할 수 있습니다.');
+setStatus('샘플 파일로 바로 체험하거나 내 Excel·CSV 파일을 불러와 정리할 수 있습니다.');
