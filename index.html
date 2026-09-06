@@ -1,15 +1,111 @@
-<!doctype html><html lang="ko"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/><meta name="description" content="Excel·CSV 파일을 불러와 중복·빈값·형식 문제를 확인하고 정리한 뒤 결과 파일로 저장하는 브라우저 데이터 작업도구"/><meta name="theme-color" content="#f5f7fb"/><title>Excel 정리 작업실</title><link rel="stylesheet" href="/src/product-ui.css"/></head><body>
-<header class="app-header"><a class="brand" href="./" aria-label="Excel 정리 작업실 홈"><span class="brand-mark">EX</span><div><h1>Excel 정리 작업실</h1><p>파일은 이 브라우저 안에서만 처리됩니다.</p></div></a><nav class="workspace-tabs" aria-label="작업 선택"><a class="active" aria-current="page" href="./">한 파일 정리</a><a href="./mapping.html">항목 이름 맞추기</a><a href="./compare.html">두 파일 비교</a><a href="./batch.html">여러 파일 정리</a></nav><div id="status" class="status" role="status" aria-live="polite"></div></header>
-<div class="shell workbench-shell"><aside class="sidebar workbench-sidebar">
-<section class="card start-card"><div class="card-heading-line"><div><p class="eyebrow">파일</p><h2>작업할 파일</h2></div><span class="privacy-chip">서버 전송 없음</span></div><div class="file-drop"><input id="fileInput" type="file" accept=".xlsx,.xls,.csv"/><button id="sampleButton" class="primary" type="button">샘플 데이터 열기</button></div><strong id="sourceName" class="source-name"></strong><p id="sourceMeta" class="source-meta"></p></section>
-<section class="card"><p class="eyebrow">빠른 정리</p><h2>한 번에 정리</h2><div class="button-grid compact-actions"><button id="trimButton" type="button">앞뒤 공백</button><button id="emailButton" type="button">이메일</button><button id="phoneButton" type="button">전화번호</button><button id="dedupeButton" type="button">중복 행</button></div><div class="history-actions"><button id="undoButton" type="button">실행 취소</button><button id="redoButton" type="button">다시 실행</button><button id="resetButton" class="danger" type="button">원본 복원</button></div></section>
-<section class="card"><p class="eyebrow">반복 작업</p><h2>작업순서 저장</h2><div class="recipe-row"><input id="recipeName" placeholder="예: 월간 거래처 정리" maxlength="40"/><button id="saveRecipeButton" class="primary" type="button">현재 순서 저장</button><select id="recipeSelect" aria-label="저장된 작업순서"></select><button id="runRecipeButton" type="button">선택 순서 실행</button></div></section>
-<section class="card rule-card"><div class="card-heading-line"><div><p class="eyebrow">검사 기준</p><h2>내 업무 기준</h2></div><span class="issue-count-chip"><strong id="ruleIssueCount">0</strong>건</span></div><div class="recipe-row"><select id="ruleColumn" aria-label="검사할 항목"></select><select id="ruleKind" aria-label="검사 방법"><option value="required">필수값</option><option value="email">이메일 형식</option><option value="number">숫자만</option><option value="enum">지정한 값만 허용</option></select><input id="ruleParameter" placeholder="예: 사용중,중지" maxlength="500"/><button id="addRuleButton" class="primary" type="button">검사 추가</button></div><div id="ruleList" class="rule-list"></div></section>
-<section class="card operation-card"><p class="eyebrow">작업 기록</p><h2>이번에 적용한 정리</h2><div id="operationList" class="operation-list"></div></section>
-</aside><main class="main workbench-main">
-<section class="workbench-intro"><div><p class="eyebrow">한 파일 정리</p><h2>거래처·주문·재고 파일을 바로 정리합니다.</h2><p>표를 먼저 확인하고 필요한 정리만 적용하세요. 원본은 유지되며 결과만 새 파일로 저장됩니다.</p></div><div class="intro-shortcuts"><a href="./compare.html">지난 파일과 비교 →</a><a href="./batch.html">여러 파일 한 번에 →</a></div></section>
-<section class="metrics" aria-label="파일 상태 요약"><article class="metric"><span>전체 행</span><strong id="rowCount">0</strong></article><article class="metric"><span>항목 수</span><strong id="columnCount">0</strong></article><article class="metric attention"><span>확인 필요</span><strong id="issueCount">0</strong></article><article class="metric"><span>중복 행</span><strong id="duplicateCount">0</strong></article></section>
-<section class="workspace data-workspace"><div class="workspace-toolbar"><div><p class="eyebrow">데이터</p><h2>파일 내용</h2><p>빈 값은 표시가 달라집니다. 검색으로 필요한 행을 빠르게 찾을 수 있습니다.</p></div><div class="toolbar-actions"><input id="searchInput" type="search" placeholder="전체 데이터 검색"/><button id="exportCsvButton" type="button">CSV 저장</button><button id="exportXlsxButton" class="primary" type="button">Excel 저장</button></div></div><div class="table-wrap data-grid-wrap"><table><thead id="tableHead"></thead><tbody id="tableBody"></tbody></table></div><div class="workspace-footer"><p class="muted">원본을 직접 수정하지 않습니다. 언제든 처음 불러온 상태로 복원할 수 있습니다.</p><div class="pager"><button id="prevPage" type="button">이전</button><span id="pageLabel"></span><button id="nextPage" type="button">다음</button></div></div></section>
-<div class="quality-grid"><section class="quality-panel rule-review-panel"><div class="quality-header"><div><p class="eyebrow">내 검사</p><h2>업무 기준에서 확인할 내용</h2><p class="quality-copy">직접 추가한 필수값·이메일·숫자·허용값 기준으로 걸린 행입니다.</p></div></div><div id="ruleIssueList" class="quality-list"></div></section>
-<section class="quality-panel"><div class="quality-header"><div><p class="eyebrow">자동 확인</p><h2>파일에서 발견한 문제</h2><p class="quality-copy">빈 값·이메일·전화번호·중복 문제를 자동으로 모아 보여줍니다.</p></div><div class="quality-controls"><select id="issueFilter" aria-label="문제 유형"><option value="all">전체 문제</option><option value="blank">빈 값</option><option value="email">이메일</option><option value="phone">전화번호</option><option value="duplicate">중복</option></select><button id="issueReportButton" type="button">문제 목록 CSV</button></div></div><div id="qualityList" class="quality-list"></div></section></div>
-</main></div><script type="module" src="/src/main.ts"></script></body></html>
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <meta name="description" content="Excel·CSV 파일을 불러와 중복·빈값·형식 문제를 확인하고 정리한 뒤 결과 파일로 저장하는 브라우저 데이터 작업도구"/>
+  <meta name="theme-color" content="#f7f8fa"/>
+  <title>Excel 정리 작업실</title>
+  <link rel="stylesheet" href="/src/product-ui.css"/>
+</head>
+<body>
+<header class="app-header excel-header">
+  <a class="brand" href="./" aria-label="Excel 정리 작업실 홈">
+    <span class="brand-mark">X</span>
+    <div><h1>Excel 정리 작업실</h1><p>브라우저에서 바로 정리하고 저장합니다.</p></div>
+  </a>
+  <nav class="workspace-tabs" aria-label="작업 선택">
+    <a class="active" aria-current="page" href="./">한 파일 정리</a>
+    <a href="./mapping.html">항목 이름 맞추기</a>
+    <a href="./compare.html">두 파일 비교</a>
+    <a href="./batch.html">여러 파일 정리</a>
+  </nav>
+  <div id="status" class="status" role="status" aria-live="polite"></div>
+</header>
+
+<main class="excel-app">
+  <section class="command-bar" aria-label="파일과 정리 도구">
+    <div class="file-command">
+      <label class="file-picker"><span>파일 열기</span><input id="fileInput" type="file" accept=".xlsx,.xls,.csv"/></label>
+      <button id="sampleButton" type="button">샘플 열기</button>
+      <div class="source-block"><strong id="sourceName" class="source-name"></strong><span id="sourceMeta" class="source-meta"></span></div>
+    </div>
+    <div class="quick-command" aria-label="빠른 정리">
+      <span class="command-label">빠른 정리</span>
+      <button id="trimButton" type="button">공백 제거</button>
+      <button id="emailButton" type="button">이메일 정리</button>
+      <button id="phoneButton" type="button">전화번호 정리</button>
+      <button id="dedupeButton" type="button">중복 제거</button>
+      <span class="command-separator" aria-hidden="true"></span>
+      <button id="undoButton" type="button">실행 취소</button>
+      <button id="redoButton" type="button">다시 실행</button>
+      <button id="resetButton" class="danger" type="button">원본 복원</button>
+    </div>
+  </section>
+
+  <section class="sheet-stats" aria-label="파일 상태 요약">
+    <div><span>전체 행</span><strong id="rowCount">0</strong></div>
+    <div><span>항목</span><strong id="columnCount">0</strong></div>
+    <div class="attention"><span>확인 필요</span><strong id="issueCount">0</strong></div>
+    <div><span>중복 행</span><strong id="duplicateCount">0</strong></div>
+    <p>파일은 서버로 전송하지 않고 현재 브라우저에서 처리합니다.</p>
+  </section>
+
+  <div class="sheet-layout">
+    <section class="sheet-pane" aria-label="데이터 표">
+      <div class="sheet-toolbar">
+        <div>
+          <h2>파일 내용</h2>
+          <p>셀을 훑어보고 필요한 정리만 적용하세요. 빈 값은 따로 표시됩니다.</p>
+        </div>
+        <div class="sheet-actions">
+          <input id="searchInput" type="search" placeholder="전체 데이터 검색" aria-label="전체 데이터 검색"/>
+          <button id="exportCsvButton" type="button">CSV 저장</button>
+          <button id="exportXlsxButton" class="primary" type="button">Excel 저장</button>
+        </div>
+      </div>
+      <div class="table-wrap data-grid-wrap"><table><thead id="tableHead"></thead><tbody id="tableBody"></tbody></table></div>
+      <div class="sheet-footer">
+        <span>원본은 유지됩니다.</span>
+        <div class="pager"><button id="prevPage" type="button">이전</button><span id="pageLabel"></span><button id="nextPage" type="button">다음</button></div>
+      </div>
+    </section>
+
+    <aside class="inspector" aria-label="검사와 작업 설정">
+      <details open>
+        <summary><span>자동 확인</span><strong id="autoIssueSummary">문제 확인</strong></summary>
+        <div class="inspector-body">
+          <p>빈 값·이메일·전화번호·중복 문제를 자동으로 모아 보여줍니다.</p>
+          <div class="inspector-controls"><select id="issueFilter" aria-label="문제 유형"><option value="all">전체 문제</option><option value="blank">빈 값</option><option value="email">이메일</option><option value="phone">전화번호</option><option value="duplicate">중복</option></select><button id="issueReportButton" type="button">문제 목록 CSV</button></div>
+          <div id="qualityList" class="quality-list"></div>
+        </div>
+      </details>
+
+      <details>
+        <summary><span>내 검사 기준</span><strong><span id="ruleIssueCount">0</span>건</strong></summary>
+        <div class="inspector-body">
+          <p>업무에 맞는 필수값·형식 기준을 추가합니다.</p>
+          <div class="rule-builder"><select id="ruleColumn" aria-label="검사할 항목"></select><select id="ruleKind" aria-label="검사 방법"><option value="required">필수값</option><option value="email">이메일 형식</option><option value="number">숫자만</option><option value="enum">지정한 값만 허용</option></select><input id="ruleParameter" placeholder="예: 사용중,중지" maxlength="500"/><button id="addRuleButton" class="primary" type="button">검사 추가</button></div>
+          <div id="ruleList" class="rule-list"></div>
+          <div id="ruleIssueList" class="quality-list rule-issue-list"></div>
+        </div>
+      </details>
+
+      <details>
+        <summary><span>작업순서 저장</span><strong>반복 작업</strong></summary>
+        <div class="inspector-body">
+          <p>지금까지 적용한 정리 순서를 저장해 다음 파일에 다시 실행합니다.</p>
+          <div class="recipe-row"><input id="recipeName" placeholder="예: 월간 거래처 정리" maxlength="40"/><button id="saveRecipeButton" class="primary" type="button">현재 순서 저장</button><select id="recipeSelect" aria-label="저장된 작업순서"></select><button id="runRecipeButton" type="button">선택 순서 실행</button></div>
+        </div>
+      </details>
+
+      <details>
+        <summary><span>작업 기록</span><strong>현재 파일</strong></summary>
+        <div class="inspector-body"><div id="operationList" class="operation-list"></div></div>
+      </details>
+    </aside>
+  </div>
+</main>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>
