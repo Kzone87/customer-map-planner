@@ -64,7 +64,9 @@ describe('batch migration', () => {
       { name: 'wrong-schema.xlsx', rows: [{ 회사: 'B', 메일: 'b@example.com', 전화: '01012345678' }] }
     ], preset);
     expect(results.map((result) => result.status)).toEqual(['SUCCESS', 'VALIDATION_FAILED', 'ERROR']);
-    expect(results[2].error).toMatch(/존재하지 않는 원본 컬럼/);
+    const structuralError = results.at(2);
+    expect(structuralError).toBeDefined();
+    expect(structuralError?.error).toMatch(/존재하지 않는 원본 컬럼/);
   });
 
   it('builds a concise migration report for every input file', () => {
