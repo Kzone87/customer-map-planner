@@ -6,6 +6,13 @@ let beforeRows: DataRow[] = [];
 let afterRows: DataRow[] = [];
 let result: CompareResult | null = null;
 
+const STATUS_LABELS: Record<CompareStatus, string> = {
+  ADDED: '새로 추가',
+  REMOVED: '삭제됨',
+  CHANGED: '값 변경',
+  UNCHANGED: '변화 없음'
+};
+
 const beforeFile = document.querySelector<HTMLInputElement>('#before-file')!;
 const afterFile = document.querySelector<HTMLInputElement>('#after-file')!;
 const beforeMeta = document.querySelector<HTMLElement>('#before-meta')!;
@@ -18,7 +25,18 @@ const resultBody = document.querySelector<HTMLTableSectionElement>('#result-body
 const statusFilter = document.querySelector<HTMLSelectElement>('#status-filter')!;
 
 function meta(rows: DataRow[], name: string): string {
-  return `${name} · ${rows.length.toLocaleString('ko-KR')}행 · ${getColumns(rows).length}컬럼`;
+  return `${name} · ${rows.length.toLocaleString('ko-KR')}행 · ${getColumns(rows).length}개 항목`;
+}
+
+function friendlyError(error: unknown): string {
+  const raw = error instanceof Error ? error.message : String(error);
+  return raw
+    .replaceAll('key', '구분값')
+    .replaceAll('Key', '구분값')
+    .replaceAll('키', '구분값')
+    .replaceAll('컬럼', '항목')
+    .replaceAll('column', '항목')
+    .trim() || '두 파일을 비교하지 못했습니다. 파일과 구분 기준을 확인해 주세요.';
 }
 
 function setStatus(message: string, error = false) {
@@ -31,7 +49,7 @@ function refreshKeys() {
   keyColumn.replaceChildren();
   const placeholder = document.createElement('option');
   placeholder.value = '';
-  placeholder.textContent = columns.length ? '고유 키 컬럼 선택' : '두 파일의 공통 컬럼이 없습니다.';
+  placeholder.textContent = columns.length ? '같은 행을 구분할 항목 선택' : '두 파일에 공통으로 있는 항목이 없습니다.';
   keyColumn.append(placeholder);
   for (const column of columns) {
     const option = document.createElement('option');
@@ -57,12 +75,12 @@ async function loadFile(file: File | undefined, side: 'before' | 'after') {
       afterMeta.textContent = meta(rows, file.name);
     }
     refreshKeys();
-    setStatus(beforeRows.length && afterRows.length ? '두 파일을 불러왔습니다. 고유 키 컬럼을 선택하세요.' : '다른 비교 파일도 선택하세요.');
+    setStatus(beforeRows.length && afterRows.length ? '두 파일을 불러왔습니다. 같은 행을 구분할 항목을 선택하세요.' : '비교할 다른 파일도 선택하세요.');
   } catch (error) {
     if (side === 'before') beforeRows = [];
     else afterRows = [];
     refreshKeys();
-    setStatus(error instanceof Error ? error.message : '파일을 읽지 못했습니다.', true);
+    setStatus(friendlyError(error), true);
   }
 }
 
@@ -93,7 +111,7 @@ function renderRows() {
   for (const entry of entries) {
     const tr = document.createElement('tr');
     tr.append(
-      td(entry.status, `status-cell ${entry.status.toLowerCase()}`),
+      td(STATUS_LABELS[entry.status], `status-cell ${entry.status.toLowerCase()}`),
       td(entry.key, 'key-cell'),
       td(entry.changedColumns.join(', ') || '—'),
       td(valuesFor(entry, 'before')),
@@ -103,7 +121,7 @@ function renderRows() {
   }
   if (!entries.length) {
     const tr = document.createElement('tr');
-    const empty = td('현재 필터에 해당하는 결과가 없습니다.', 'empty-row');
+    const empty = td('선택한 조건에 해당하는 결과가 없습니다.', 'empty-row');
     empty.colSpan = 5;
     tr.append(empty);
     resultBody.append(tr);
@@ -119,7 +137,7 @@ function renderResult(next: CompareResult) {
   resultSection.hidden = false;
   statusFilter.value = 'ALL';
   renderRows();
-  setStatus(`총 ${next.summary.total.toLocaleString('ko-KR')}개 키를 비교했습니다. 변경 리포트는 동일 행을 제외하고 내보냅니다.`);
+  setStatus(`총 ${next.summary.total.toLocaleString('ko-KR')}개 행을 비교했습니다. 바뀐 내용은 파일로 저장할 수 있습니다.`);
 }
 
 function download(blob: Blob, filename: string) {
@@ -143,7 +161,7 @@ compareButton.addEventListener('click', () => {
   } catch (error) {
     result = null;
     resultSection.hidden = true;
-    setStatus(error instanceof Error ? error.message : '비교에 실패했습니다.', true);
+    setStatus(friendlyError(error), true);
   }
 });
 
@@ -151,10 +169,10 @@ statusFilter.addEventListener('change', renderRows);
 
 document.querySelector<HTMLButtonElement>('#export-csv')!.addEventListener('click', () => {
   if (!result) return;
-  download(exportCsv(changeReportRows(result)), 'data-change-report.csv');
+  download(exportCsv(changeReportRows(result)), '파일-변경목록.csv');
 });
 
 document.querySelector<HTMLButtonElement>('#export-xlsx')!.addEventListener('click', () => {
   if (!result) return;
-  download(exportXlsx(changeReportRows(result)), 'data-change-report.xlsx');
+  download(exportXlsx(changeReportRows(result)), '파일-변경목록.xlsx');
 });
