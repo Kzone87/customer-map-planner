@@ -84,8 +84,7 @@ function renderResults(results: BatchResult[]) {
 async function readFiles(files: File[]) {
   const items: { name: string; rows: DataRow[] }[] = [];
   const parseErrors: BatchResult[] = [];
-  for (let index = 0; index < files.length; index += 1) {
-    const file = files[index];
+  for (const [index, file] of files.entries()) {
     progressBar.style.width = `${Math.round((index / Math.max(files.length, 1)) * 55)}%`;
     batchStatus.textContent = `${index + 1}/${files.length} 파일 읽는 중: ${file.name}`;
     try {
