@@ -13,12 +13,25 @@ const STATUS_LABELS: Record<CompareStatus, string> = {
   UNCHANGED: '변화 없음'
 };
 
+const SAMPLE_BEFORE: DataRow[] = [
+  { 고객번호: 'C001', 거래처명: '모노상사', 담당자: '김민수', 상태: '사용중', 월한도: 300000 },
+  { 고객번호: 'C002', 거래처명: '라이트웍스', 담당자: '박지연', 상태: '사용중', 월한도: 150000 },
+  { 고객번호: 'C003', 거래처명: '서진기획', 담당자: '오세훈', 상태: '확인중', 월한도: 200000 }
+];
+
+const SAMPLE_AFTER: DataRow[] = [
+  { 고객번호: 'C001', 거래처명: '모노상사', 담당자: '김민수', 상태: '사용중', 월한도: 350000 },
+  { 고객번호: 'C003', 거래처명: '서진기획', 담당자: '오세훈', 상태: '사용중', 월한도: 200000 },
+  { 고객번호: 'C004', 거래처명: '한빛유통', 담당자: '이수빈', 상태: '사용중', 월한도: 180000 }
+];
+
 const beforeFile = document.querySelector<HTMLInputElement>('#before-file')!;
 const afterFile = document.querySelector<HTMLInputElement>('#after-file')!;
 const beforeMeta = document.querySelector<HTMLElement>('#before-meta')!;
 const afterMeta = document.querySelector<HTMLElement>('#after-meta')!;
 const keyColumn = document.querySelector<HTMLSelectElement>('#key-column')!;
 const compareButton = document.querySelector<HTMLButtonElement>('#compare-button')!;
+const sampleButton = document.querySelector<HTMLButtonElement>('#compare-sample')!;
 const statusMessage = document.querySelector<HTMLElement>('#status-message')!;
 const resultSection = document.querySelector<HTMLElement>('#result-section')!;
 const resultBody = document.querySelector<HTMLTableSectionElement>('#result-body')!;
@@ -140,6 +153,28 @@ function renderResult(next: CompareResult) {
   setStatus(`총 ${next.summary.total.toLocaleString('ko-KR')}개 행을 비교했습니다. 바뀐 내용은 파일로 저장할 수 있습니다.`);
 }
 
+function runComparison() {
+  try {
+    const next = compareDatasets(beforeRows, afterRows, keyColumn.value);
+    renderResult(next);
+  } catch (error) {
+    result = null;
+    resultSection.hidden = true;
+    setStatus(friendlyError(error), true);
+  }
+}
+
+function loadSampleComparison() {
+  beforeRows = SAMPLE_BEFORE.map((row) => ({ ...row }));
+  afterRows = SAMPLE_AFTER.map((row) => ({ ...row }));
+  beforeMeta.textContent = meta(beforeRows, '지난달_거래처.xlsx');
+  afterMeta.textContent = meta(afterRows, '이번달_거래처.xlsx');
+  refreshKeys();
+  if ([...keyColumn.options].some((option) => option.value === '고객번호')) keyColumn.value = '고객번호';
+  setStatus('샘플 두 파일을 불러왔습니다. 고객번호를 기준으로 바로 비교했습니다.');
+  runComparison();
+}
+
 function download(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
@@ -153,18 +188,8 @@ function download(blob: Blob, filename: string) {
 
 beforeFile.addEventListener('change', () => void loadFile(beforeFile.files?.[0], 'before'));
 afterFile.addEventListener('change', () => void loadFile(afterFile.files?.[0], 'after'));
-
-compareButton.addEventListener('click', () => {
-  try {
-    const next = compareDatasets(beforeRows, afterRows, keyColumn.value);
-    renderResult(next);
-  } catch (error) {
-    result = null;
-    resultSection.hidden = true;
-    setStatus(friendlyError(error), true);
-  }
-});
-
+sampleButton.addEventListener('click', loadSampleComparison);
+compareButton.addEventListener('click', runComparison);
 statusFilter.addEventListener('change', renderRows);
 
 document.querySelector<HTMLButtonElement>('#export-csv')!.addEventListener('click', () => {
