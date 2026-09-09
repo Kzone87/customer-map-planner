@@ -21,7 +21,7 @@ jobs:
       - name: Install
         run: npm install
       - name: Dependency audit
-        run: npm run audit:high
+        run: npm run audit
       - name: Test
         run: npm test
       - name: Type-check and build
