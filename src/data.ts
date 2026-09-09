@@ -6,11 +6,21 @@ export type QualityIssue = { rowIndex: number; column: string; type: 'blank' | '
 export type DataProfile = { rows: number; columns: string[]; blankCells: number; invalidEmails: number; invalidPhones: number; duplicateRows: number; issues: QualityIssue[] };
 export type OperationKind = 'trim' | 'email' | 'phone' | 'dedupe';
 export type Operation = { kind: OperationKind; label: string };
+export type WorkbookInspection = { fileName: string; fileSize: number; sheetNames: string[] };
+
+export const IMPORT_LIMITS = Object.freeze({
+  maxFileBytes: 20 * 1024 * 1024,
+  maxSheets: 50,
+  maxRows: 100_000,
+  maxColumns: 300,
+  maxCells: 5_000_000
+});
 
 const EMAIL_HINT = /(email|e-mail|메일|이메일)/i;
 const PHONE_HINT = /(phone|mobile|tel|전화|연락처|휴대폰)/i;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const VALID_OPERATIONS = new Set<OperationKind>(['trim', 'email', 'phone', 'dedupe']);
+const SUPPORTED_EXTENSIONS = new Set(['xlsx', 'xls', 'csv']);
 
 export const SAMPLE_ROWS: DataRow[] = [
   { 거래처명: '  새한상사 ', 이메일: 'SALES@SAEHAN.CO.KR', 연락처: '01012345678', 지역: '서울', 상태: '사용중' },
@@ -20,6 +30,136 @@ export const SAMPLE_ROWS: DataRow[] = [
   { 거래처명: '대한솔루션', 이메일: '', 연락처: '031 777 8888', 지역: '경기', 상태: '중지' },
   { 거래처명: '한빛기획', 이메일: 'hello@hanbit.kr', 연락처: '01022223333', 지역: '부산', 상태: '사용중' }
 ];
+
+function extensionOf(fileName: string): string {
+  return fileName.split('.').pop()?.toLowerCase() ?? '';
+}
+
+function validateInputFile(file: File) {
+  const extension = extensionOf(file.name);
+  if (!SUPPORTED_EXTENSIONS.has(extension)) throw new Error('Excel 또는 CSV 파일만 불러올 수 있습니다.');
+  if (file.size <= 0) throw new Error('내용이 없는 파일은 불러올 수 없습니다.');
+  if (file.size > IMPORT_LIMITS.maxFileBytes) {
+    throw new Error(`파일이 너무 큽니다. 한 파일은 ${Math.floor(IMPORT_LIMITS.maxFileBytes / 1024 / 1024)}MB 이하만 처리할 수 있습니다.`);
+  }
+}
+
+function readWorkbook(buffer: ArrayBuffer): XLSX.WorkBook {
+  try {
+    return XLSX.read(buffer, { type: 'array' });
+  } catch {
+    throw new Error('파일 형식을 읽지 못했습니다. 손상되지 않은 Excel 또는 CSV 파일인지 확인해 주세요.');
+  }
+}
+
+function dataSheetNames(workbook: XLSX.WorkBook): string[] {
+  return workbook.SheetNames.filter((name) => Boolean(workbook.Sheets[name]?.['!ref']));
+}
+
+export function validateTableShape(rows: number, columns: number) {
+  if (rows > IMPORT_LIMITS.maxRows) throw new Error(`행이 너무 많습니다. 한 번에 ${IMPORT_LIMITS.maxRows.toLocaleString('ko-KR')}행 이하만 처리할 수 있습니다.`);
+  if (columns > IMPORT_LIMITS.maxColumns) throw new Error(`항목이 너무 많습니다. 한 번에 ${IMPORT_LIMITS.maxColumns.toLocaleString('ko-KR')}개 이하만 처리할 수 있습니다.`);
+  if (rows * columns > IMPORT_LIMITS.maxCells) throw new Error('표가 너무 큽니다. 행과 항목 수를 줄인 뒤 다시 시도해 주세요.');
+}
+
+export async function inspectFile(file: File): Promise<WorkbookInspection> {
+  validateInputFile(file);
+  const workbook = readWorkbook(await file.arrayBuffer());
+  const sheetNames = dataSheetNames(workbook);
+  if (!sheetNames.length) throw new Error('파일 안에서 읽을 수 있는 표를 찾지 못했습니다.');
+  if (sheetNames.length > IMPORT_LIMITS.maxSheets) throw new Error(`시트가 너무 많습니다. 한 파일은 ${IMPORT_LIMITS.maxSheets}개 시트 이하만 처리할 수 있습니다.`);
+  return { fileName: file.name, fileSize: file.size, sheetNames };
+}
+
+function ensureSheetPickerStyle() {
+  if (typeof document === 'undefined' || document.getElementById('workbook-sheet-picker-style')) return;
+  const style = document.createElement('style');
+  style.id = 'workbook-sheet-picker-style';
+  style.textContent = `
+    .workbook-sheet-dialog{border:0;border-radius:18px;padding:0;width:min(460px,calc(100vw - 32px));box-shadow:0 24px 80px rgba(20,24,32,.24);color:#20242c;background:#fff}
+    .workbook-sheet-dialog::backdrop{background:rgba(20,24,32,.48);backdrop-filter:blur(3px)}
+    .workbook-sheet-dialog form{padding:24px;display:grid;gap:16px}
+    .workbook-sheet-dialog h2{margin:0;font-size:20px;line-height:1.35}
+    .workbook-sheet-dialog p{margin:0;color:#656b76;line-height:1.6;font-size:14px}
+    .workbook-sheet-dialog label{display:grid;gap:8px;font-size:13px;font-weight:700}
+    .workbook-sheet-dialog select{width:100%;min-height:44px;border:1px solid #cfd4dc;border-radius:10px;background:#fff;padding:0 12px;font:inherit}
+    .workbook-sheet-dialog .sheet-dialog-actions{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+    .workbook-sheet-dialog button{min-height:42px;border-radius:10px;border:1px solid #cfd4dc;background:#fff;padding:0 16px;font:inherit;font-weight:700;cursor:pointer}
+    .workbook-sheet-dialog button[data-primary="true"]{background:#2b2f38;color:#fff;border-color:#2b2f38}
+  `;
+  document.head.appendChild(style);
+}
+
+async function chooseSheet(sheetNames: string[], fileName: string): Promise<string> {
+  if (sheetNames.length === 1) return sheetNames[0]!;
+  if (typeof document === 'undefined' || typeof HTMLDialogElement === 'undefined') {
+    throw new Error(`여러 시트가 있는 파일입니다. 사용할 시트를 선택해야 합니다: ${sheetNames.join(', ')}`);
+  }
+  ensureSheetPickerStyle();
+  return new Promise<string>((resolve, reject) => {
+    const dialog = document.createElement('dialog');
+    dialog.className = 'workbook-sheet-dialog';
+    dialog.id = 'workbook-sheet-dialog';
+    dialog.setAttribute('aria-labelledby', 'workbook-sheet-title');
+
+    const form = document.createElement('form');
+    form.method = 'dialog';
+    const title = document.createElement('h2');
+    title.id = 'workbook-sheet-title';
+    title.textContent = '처리할 시트를 선택하세요.';
+    const description = document.createElement('p');
+    description.textContent = `${fileName}에는 데이터가 있는 시트가 ${sheetNames.length}개 있습니다. 잘못된 시트를 자동으로 처리하지 않습니다.`;
+    const label = document.createElement('label');
+    label.textContent = '사용할 시트';
+    const select = document.createElement('select');
+    select.id = 'workbook-sheet-select';
+    select.setAttribute('aria-label', '사용할 시트');
+    sheetNames.forEach((name) => {
+      const option = document.createElement('option');
+      option.value = name;
+      option.textContent = name;
+      select.appendChild(option);
+    });
+    label.appendChild(select);
+
+    const actions = document.createElement('div');
+    actions.className = 'sheet-dialog-actions';
+    const cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.textContent = '취소';
+    const confirm = document.createElement('button');
+    confirm.type = 'submit';
+    confirm.dataset.primary = 'true';
+    confirm.textContent = '이 시트 사용';
+    actions.append(cancel, confirm);
+    form.append(title, description, label, actions);
+    dialog.appendChild(form);
+    document.body.appendChild(dialog);
+
+    let settled = false;
+    const cleanup = () => dialog.remove();
+    const fail = () => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error('시트 선택을 취소했습니다.'));
+    };
+    cancel.addEventListener('click', () => { dialog.close(); fail(); });
+    dialog.addEventListener('cancel', (event) => { event.preventDefault(); dialog.close(); fail(); });
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      if (settled) return;
+      const selected = select.value;
+      if (!sheetNames.includes(selected)) return;
+      settled = true;
+      dialog.close();
+      cleanup();
+      resolve(selected);
+    });
+    dialog.showModal();
+    select.focus();
+  });
+}
 
 function normalizeHeader(value: unknown, index: number): string {
   const text = String(value ?? '').trim();
@@ -37,17 +177,44 @@ function normalizeRows(rows: Record<string, unknown>[]): DataRow[] {
   });
 }
 
+function rowsFromSheet(sheet: XLSX.WorkSheet): DataRow[] {
+  const ref = sheet['!ref'];
+  if (!ref) throw new Error('선택한 시트에 읽을 수 있는 표가 없습니다.');
+  const range = XLSX.utils.decode_range(ref);
+  const estimatedRows = Math.max(0, range.e.r - range.s.r);
+  const estimatedColumns = Math.max(0, range.e.c - range.s.c + 1);
+  validateTableShape(estimatedRows, estimatedColumns);
+
+  const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: null, raw: false, blankrows: false });
+  if (matrix.length < 2) throw new Error('선택한 시트에 불러올 데이터 행이 없습니다.');
+  const headerValues = matrix[0] ?? [];
+  const headers = headerValues.map((value, index) => normalizeHeader(value, index));
+  validateTableShape(matrix.length - 1, headers.length);
+
+  const duplicates = headers.filter((header, index) => headers.indexOf(header) !== index);
+  if (duplicates.length) {
+    throw new Error(`같은 항목 이름이 두 번 이상 있습니다: ${[...new Set(duplicates)].join(', ')}. 머리글을 서로 다르게 바꾼 뒤 다시 시도해 주세요.`);
+  }
+
+  const rows = matrix.slice(1).map((values) => {
+    const row: DataRow = {};
+    headers.forEach((header, index) => { row[header] = normalizeCell(values[index]); });
+    return row;
+  });
+  if (!rows.length) throw new Error('불러올 데이터가 없습니다.');
+  return rows;
+}
+
 export async function parseFile(file: File): Promise<DataRow[]> {
-  const extension = file.name.split('.').pop()?.toLowerCase();
-  if (!extension || !['xlsx', 'xls', 'csv'].includes(extension)) throw new Error('Excel 또는 CSV 파일만 불러올 수 있습니다.');
-  const workbook = XLSX.read(await file.arrayBuffer(), { type: 'array' });
-  const firstSheetName = workbook.SheetNames[0];
-  if (!firstSheetName) throw new Error('파일 안에서 읽을 수 있는 표를 찾지 못했습니다.');
-  const sheet = workbook.Sheets[firstSheetName];
-  if (!sheet) throw new Error('파일의 첫 번째 표를 읽지 못했습니다.');
-  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: null, raw: false });
-  if (rows.length === 0) throw new Error('불러올 데이터가 없습니다.');
-  return normalizeRows(rows);
+  validateInputFile(file);
+  const workbook = readWorkbook(await file.arrayBuffer());
+  const sheetNames = dataSheetNames(workbook);
+  if (!sheetNames.length) throw new Error('파일 안에서 읽을 수 있는 표를 찾지 못했습니다.');
+  if (sheetNames.length > IMPORT_LIMITS.maxSheets) throw new Error(`시트가 너무 많습니다. 한 파일은 ${IMPORT_LIMITS.maxSheets}개 시트 이하만 처리할 수 있습니다.`);
+  const selectedSheetName = await chooseSheet(sheetNames, file.name);
+  const sheet = workbook.Sheets[selectedSheetName];
+  if (!sheet) throw new Error('선택한 시트를 읽지 못했습니다.');
+  return rowsFromSheet(sheet);
 }
 
 export function getColumns(rows: DataRow[]): string[] {
