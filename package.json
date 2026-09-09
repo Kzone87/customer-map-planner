@@ -1,14 +1,21 @@
 {
   "name": "customer-data-workbench",
   "private": true,
-  "version": "3.0.0",
+  "version": "3.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "audit:high": "npm audit --audit-level=high"
   },
-  "dependencies": { "xlsx": "0.18.5" },
-  "devDependencies": { "typescript": "5.9.2", "vite": "7.1.4", "vitest": "3.2.4" }
+  "dependencies": {
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "devDependencies": {
+    "typescript": "5.9.2",
+    "vite": "7.3.6",
+    "vitest": "3.2.7"
+  }
 }
