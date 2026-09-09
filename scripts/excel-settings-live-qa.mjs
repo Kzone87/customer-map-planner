@@ -52,7 +52,8 @@ const importNavigation = page.waitForNavigation({ waitUntil: 'networkidle' });
 await page.locator('#importSettingsInput').setInputFiles({ name: 'qa-settings.json', mimeType: 'application/json', buffer: settingsBytes });
 await importNavigation;
 await page.waitForFunction(() => document.querySelectorAll('#recipeSelect option').length > 1);
-if (!(await page.locator('#recipeSelect').innerText()).includes('QA 월간 정리')) throw new Error('settings import did not restore saved recipe');
+const restoredRecipeOptions = await page.locator('#recipeSelect option').allTextContents();
+if (!restoredRecipeOptions.some((text) => text.includes('QA 월간 정리'))) throw new Error(`settings import did not restore saved recipe: ${restoredRecipeOptions.join(' | ')}`);
 
 await page.locator('details').filter({ hasText: '내 검사 기준' }).locator('summary').click();
 if (!(await page.locator('#ruleList').innerText()).includes('거래처명')) throw new Error('settings import did not restore saved validation rule');
