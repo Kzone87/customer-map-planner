@@ -24,6 +24,8 @@ await page.locator('#trimButton').click();
 await page.locator('#emailButton').click();
 await page.locator('#recipeName').fill('QA 월간 정리');
 await page.locator('#saveRecipeButton').click();
+
+await page.locator('details').filter({ hasText: '내 검사 기준' }).locator('summary').click();
 await page.locator('#ruleColumn').selectOption('거래처명');
 await page.locator('#ruleKind').selectOption('required');
 await page.locator('#addRuleButton').click();
@@ -41,14 +43,18 @@ if (!exported.recipes.some((item) => item.name === 'QA 월간 정리')) throw ne
 if (!exported.rules.some((item) => item.column === '거래처명' && item.kind === 'required')) throw new Error('saved rule is missing from settings export');
 
 page.once('dialog', (dialog) => dialog.accept());
+const clearNavigation = page.waitForNavigation({ waitUntil: 'networkidle' });
 await page.locator('#clearSettingsButton').click();
-await page.waitForLoadState('networkidle');
+await clearNavigation;
 if ((await page.locator('#recipeSelect option').count()) !== 1) throw new Error('settings clear did not remove saved recipes');
 
+const importNavigation = page.waitForNavigation({ waitUntil: 'networkidle' });
 await page.locator('#importSettingsInput').setInputFiles({ name: 'qa-settings.json', mimeType: 'application/json', buffer: settingsBytes });
-await page.waitForLoadState('networkidle');
+await importNavigation;
 await page.waitForFunction(() => document.querySelectorAll('#recipeSelect option').length > 1);
 if (!(await page.locator('#recipeSelect').innerText()).includes('QA 월간 정리')) throw new Error('settings import did not restore saved recipe');
+
+await page.locator('details').filter({ hasText: '내 검사 기준' }).locator('summary').click();
 if (!(await page.locator('#ruleList').innerText()).includes('거래처명')) throw new Error('settings import did not restore saved validation rule');
 
 const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
