@@ -66,7 +66,9 @@ jobs:
       - name: Verify Excel Workbench in real Chrome
         env:
           EXCEL_BASE_URL: ${{ github.event_name == 'pull_request' && 'http://127.0.0.1:4173/customer-map-planner/' || 'https://kzone87.github.io/customer-map-planner/' }}
-        run: node scripts/excel-live-qa.mjs
+        run: |
+          node scripts/excel-live-qa.mjs
+          node scripts/excel-settings-live-qa.mjs
       - name: Upload live evidence
         if: always()
         uses: actions/upload-artifact@v4
