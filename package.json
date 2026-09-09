@@ -8,14 +8,14 @@
     "build": "tsc --noEmit && vite build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "audit:high": "npm audit --audit-level=high"
+    "audit": "npm audit --audit-level=moderate"
   },
   "dependencies": {
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   },
   "devDependencies": {
     "typescript": "5.9.2",
-    "vite": "7.3.6",
-    "vitest": "3.2.7"
+    "vite": "8.2.2",
+    "vitest": "5.0.0"
   }
 }
