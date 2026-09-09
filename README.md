@@ -1,4 +1,4 @@
-# Excel 정리 작업실 · Customer Data Workbench V3
+# Excel 정리 작업실 · Customer Data Workbench V3.1
 
 ![CI](https://github.com/Kzone87/customer-map-planner/actions/workflows/ci.yml/badge.svg)
 
@@ -12,12 +12,14 @@ Excel/CSV 데이터를 **서버 업로드 없이 브라우저에서 검증·정�
 
 ### 1. 한 파일 정리 · `/`
 - XLSX / XLS / CSV import
+- 여러 데이터 시트가 있으면 처리할 시트 명시적 선택
 - 빈 값 / 이메일 / 전화번호 / 완전 중복 탐지
 - 공백 / 이메일 / 전화번호 정규화
 - 중복 행 제거
 - Undo / Redo
 - 작업순서 저장·재실행
 - 사용자 Validation Rule Builder
+- 작업순서 + 검사 기준 JSON 백업/복원
 - CSV / XLSX export
 
 ### 2. 항목 이름 맞추기 · `/mapping.html`
@@ -43,6 +45,22 @@ Excel/CSV 데이터를 **서버 업로드 없이 브라우저에서 검증·정�
 - SUCCESS / VALIDATION_FAILED / ERROR 격리
 - 정상 결과 Combined XLSX
 - 처리 결과 CSV
+
+## Workbook import safety
+
+사용자 파일은 신뢰하지 않는 입력으로 취급합니다.
+
+- 허용 형식: `.xlsx`, `.xls`, `.csv`
+- 파일당 최대 20 MB
+- 데이터 시트 최대 50개
+- 선택 시트당 최대 100,000행
+- 최대 300개 항목
+- 최대 5,000,000 셀
+- 다중 시트 통합문서는 첫 시트를 임의로 사용하지 않고 사용자가 직접 선택
+- 공백 정규화 후 같은 머리글이 중복되면 임의 변경하지 않고 차단
+- 손상/비정상 파일은 사용자 오류 상태로 처리
+
+CSV는 UTF-8을 권장합니다.
 
 ## Workflow 계약
 
@@ -77,16 +95,25 @@ D.xlsx → SUCCESS
 - 외부 API Key 없음
 - 파일 서버 업로드 없음
 - Browser File API + 메모리 처리
+- 파일 행 데이터는 localStorage에 저장하지 않음
 - 재사용 설정만 localStorage 사용
+- 작업순서와 검사 기준은 versioned JSON으로 백업/복원 가능
+- settings JSON에는 Excel/CSV 데이터 행이 포함되지 않음
 - spreadsheet formula injection을 고려한 export
 
 민감한 거래처·고객 데이터를 별도 SaaS 서버에 올리지 않고도 작업할 수 있는 방향으로 설계했습니다.
+
+## Output boundary
+
+Excel Workbench는 **표 데이터 업무도구**이며 원본 Excel 서식을 그대로 보존하는 편집기가 아닙니다.
+
+정리 결과는 새 CSV/XLSX 파일로 생성됩니다. 원본의 셀 스타일, 차트, 이미지, 매크로, 주석, 병합 레이아웃 등 workbook presentation을 보존하는 것은 제품 계약 범위가 아닙니다.
 
 ## Tech stack
 
 - TypeScript
 - Vite multi-page build
-- SheetJS
+- SheetJS CE 0.20.3 official distribution
 - Browser File API
 - localStorage
 - Vitest
@@ -97,12 +124,28 @@ D.xlsx → SUCCESS
 
 ```bash
 npm install
+npm run audit
 npm test
 npm run build
-npm run dev
 ```
 
-CI에서는 데이터 처리, mapping, validation rule, report, compare, workflow, UI quality 테스트와 strict TypeScript type-check, Vite production build를 실행합니다.
+CI에서는 dependency audit, 데이터 처리, import guardrail, mapping, validation rule, settings portability, report, compare, workflow, UI quality 테스트와 strict TypeScript type-check, Vite production build를 실행합니다.
+
+별도 `Excel Workbench live QA`는 실제 Chrome에서 다음을 검증합니다.
+
+- 4개 화면 × 1440 / 768 / 390
+- console / page / request / HTTP 오류
+- horizontal overflow
+- 실제 CSV upload → 정리 → XLSX download
+- 실제 multi-sheet XLSX upload → 시트 선택
+- 실제 legacy XLS 한글 데이터 import
+- mapping / compare / batch download
+- settings JSON export → clear → import → restore
+- main 배포에서는 same-SHA GitHub Pages 완료 후 실제 production URL 재검증
+
+## Delivery
+
+실제 정적 배포와 Acceptance 기준은 [`DELIVERY_RUNBOOK.md`](./DELIVERY_RUNBOOK.md), 보안 경계는 [`SECURITY.md`](./SECURITY.md)를 따릅니다.
 
 ## Client-facing use cases
 
