@@ -1,0 +1,77 @@
+name: Excel Workbench live QA
+
+on:
+  pull_request:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  live-qa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+      - name: Install and build
+        run: |
+          npm install
+          npm test
+          npm run build
+      - name: Wait for same-SHA Pages deployment
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 90); do
+            state="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${GITHUB_SHA}&per_page=30" --jq '[.workflow_runs[] | select(.name == "deploy-pages")][0] | if . == null then "missing|" else (.status + "|" + (.conclusion // "")) end')"
+            status="${state%%|*}"
+            conclusion="${state#*|}"
+            echo "Pages deployment: ${status} ${conclusion} (attempt ${attempt})"
+            if [ "$status" = completed ]; then
+              test "$conclusion" = success
+              exit 0
+            fi
+            sleep 5
+          done
+          echo 'Timed out waiting for the same-SHA Pages deployment.' >&2
+          exit 1
+      - name: Serve PR build locally
+        if: github.event_name == 'pull_request'
+        run: |
+          mkdir -p .qa-site/customer-map-planner
+          cp -R dist/. .qa-site/customer-map-planner/
+          python3 -m http.server 4173 --directory .qa-site >/tmp/excel-qa-http.log 2>&1 &
+          for i in {1..30}; do
+            curl -fsS http://127.0.0.1:4173/customer-map-planner/ >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/excel-qa-http.log >&2
+          exit 1
+      - name: Locate hosted Chrome
+        run: |
+          set -euo pipefail
+          CHROME_PATH="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          test -n "$CHROME_PATH"
+          echo "CHROME_PATH=$CHROME_PATH" >> "$GITHUB_ENV"
+          "$CHROME_PATH" --version
+      - name: Install browser driver only
+        run: npm install --no-save --package-lock=false --ignore-scripts playwright-core@1.55.0
+      - name: Verify Excel Workbench in real Chrome
+        env:
+          EXCEL_BASE_URL: ${{ github.event_name == 'pull_request' && 'http://127.0.0.1:4173/customer-map-planner/' || 'https://kzone87.github.io/customer-map-planner/' }}
+        run: node scripts/excel-live-qa.mjs
+      - name: Upload live evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: excel-workbench-live-qa
+          path: excel-live-qa-artifacts
+          if-no-files-found: warn
+          retention-days: 7
