@@ -20,6 +20,8 @@ jobs:
           node-version: '24'
       - name: Install
         run: npm install
+      - name: Dependency audit
+        run: npm run audit
       - name: Test
         run: npm test
       - name: Type-check and build

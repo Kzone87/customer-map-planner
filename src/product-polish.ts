@@ -1,3 +1,5 @@
+import './settings-portability';
+
 const replacements: Array<[RegExp, string]> = [
   [/샘플/g, '예제'],
   [/바로 체험/g, '바로 확인'],
