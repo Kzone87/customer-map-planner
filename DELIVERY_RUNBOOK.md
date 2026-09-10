@@ -33,7 +33,7 @@ The browser stores only reusable workbench settings:
 
 Those settings can be exported as a versioned JSON file, cleared from the browser, and restored on another browser. The settings JSON never contains imported spreadsheet rows.
 
-## Production build
+## Production build and immutable handover
 
 Required build environment:
 
@@ -46,18 +46,26 @@ Build and verification:
 npm install
 npm run audit
 npm test
-npm run build
+npm run build:delivery
 ```
 
-The deployable static output is `dist/`.
+`build:delivery` runs the strict TypeScript/Vite production build, creates `dist/MANIFEST.json`, and immediately verifies every recorded file size and SHA-256 digest. The deployable and handover output is the same verified `dist/` directory.
 
-The current Vite base path is `/customer-map-planner/`. If the product is deployed under another path or domain, update `vite.config.ts`, rebuild, and rerun the browser acceptance suite against that deployment URL.
+For an already-built handover directory, verification can be repeated with:
+
+```bash
+npm run verify:delivery
+```
+
+`MANIFEST.json` records the product, delivery type, source commit when built in CI, build timestamp, and the byte size/SHA-256 of each application file. Any changed, missing, or substituted file fails verification. This makes the customer handover package traceable to the tested build rather than an informal copy of source files.
+
+The current Vite base path is `/customer-map-planner/`. If the product is deployed under another path or domain, update `vite.config.ts`, rebuild, regenerate the manifest, and rerun the browser acceptance suite against that deployment URL.
 
 ## Deployment options
 
-The `dist/` directory may be deployed to any static HTTPS host, including GitHub Pages, Cloudflare Pages, S3-compatible static hosting, or a customer web server.
+The verified `dist/` directory may be deployed to any static HTTPS host, including GitHub Pages, Cloudflare Pages, S3-compatible static hosting, or a customer web server.
 
-No application backend is required for the public local-first mode.
+No application backend is required for the public local-first mode. The Pages workflow deploys the same manifest-bearing `dist/` artifact that CI verifies.
 
 ## Release acceptance gates
 
@@ -67,15 +75,17 @@ A release is accepted only when all of the following pass for the same source re
 2. unit/domain tests pass
 3. strict TypeScript type-check passes
 4. production Vite build passes
-5. real Chrome renders all four screens at 1440, 768 and 390 widths without horizontal overflow or runtime/network errors
-6. real CSV import -> cleanup -> XLSX download passes
-7. real multi-sheet XLSX import -> explicit worksheet selection passes
-8. real legacy XLS Korean-data import passes
-9. mapping -> apply -> download passes
-10. compare -> diff -> download passes
-11. batch -> isolated results -> report download passes
-12. settings save -> JSON export -> clear -> JSON import -> restore passes
-13. after merge, the same main SHA is deployed and the production URL passes the same Chrome suite
+5. delivery manifest generation and SHA-256 verification pass
+6. the verified `dist/` artifact is retained by CI for handover evidence
+7. real Chrome renders all four screens at 1440, 768 and 390 widths without horizontal overflow or runtime/network errors
+8. real CSV import -> cleanup -> XLSX download passes
+9. real multi-sheet XLSX import -> explicit worksheet selection passes
+10. real legacy XLS Korean-data import passes
+11. mapping -> apply -> download passes
+12. compare -> diff -> download passes
+13. batch -> isolated results -> report download passes
+14. settings save -> JSON export -> clear -> JSON import -> restore passes
+15. after merge, the same main SHA is deployed and the production URL passes the same Chrome suite
 
 ## Recovery and support
 
