@@ -56,6 +56,6 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build, wait-for-branch-pages]
     steps:
-      - name: Deploy verified Vite dist to GitHub Pages
+      - name: Deploy Vite dist to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
