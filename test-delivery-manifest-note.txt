@@ -1,0 +1,1 @@
+Delivery artifact integrity is verified by npm run build:delivery and npm run verify:delivery in CI. This marker is intentionally plain text and contains no customer data.
