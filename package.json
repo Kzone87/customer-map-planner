@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "build:delivery": "npm run build && node scripts/build-delivery.mjs && node scripts/verify-delivery.mjs",
+    "build:delivery": "npm run build && node scripts/build-delivery.mjs && node scripts/verify-delivery.mjs && node scripts/delivery-self-test.mjs",
     "verify:delivery": "node scripts/verify-delivery.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
